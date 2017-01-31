@@ -129,14 +129,21 @@ let sbytes_of_data : data -> sbyte list = function
 let debug_simulator = ref false
 
 (* Interpret a condition code with respect to the given flags. *)
-let interp_cnd {fo; fs; fz} : cnd -> bool = fun x -> failwith "interp_cnd unimplemented"
-
-
+let interp_cnd {fo; fs; fz} : cnd -> bool = function
+  | Eq -> fz
+  | Neq -> not(fz)
+  | Gt -> fs == fo && not(fz)
+  | Ge -> fs == fo
+  | Lt -> fs != fo
+  | Le -> (fs != fo) || fz
 
 (* Maps an X86lite address into Some OCaml array index,
    or None if the address is not within the legal address space. *)
 let map_addr (addr:quad) : int option =
-  failwith "map_addr not implemented"
+  if addr >= 0x400000L && addr <= 0x410000L then
+    Some ((Int64.to_int addr) - (Int64.to_int 0x400000L))
+  else
+    None
 
 (* Simulates one step of the machine:
     - fetch the instruction at %rip
@@ -146,7 +153,47 @@ let map_addr (addr:quad) : int option =
     - set the condition flags
 *)
 let step (m:mach) : unit =
-failwith "step unimplemented"
+  let memory_address = 
+    match map_addr m.regs.(rind Rip) with
+    | Some c -> c
+    | None -> 0
+  in
+  let ins = m.mem.(memory_address) in
+  begin match ins with
+  | InsB0 x ->
+    begin match x with
+    | (Movq, [src; dest]) ->
+      begin match (src, dest) with
+      | (Imm (Lit imm), Reg reg) ->
+        m.regs.(rind reg) <- imm
+      | _ -> ()
+      end
+    | (Pushq, h::tl) -> ()
+    | (Popq, h::tl) -> ()
+    | (Leaq, h::tl) -> ()
+    | (Incq, h::tl) -> ()
+    | (Decq, h::tl) -> ()
+    | (Negq, h::tl) -> ()
+    | (Notq, h::tl) -> ()
+    | (Addq, h::tl) -> ()
+    | (Subq, h::tl) -> ()
+    | (Imulq, h::tl) -> ()
+    | (Xorq, h::tl) -> ()
+    | (Orq, h::tl) -> ()
+    | (Andq, h::tl) -> ()
+    | (Shlq, h::tl) -> ()
+    | (Sarq, h::tl) -> ()
+    | (Shrq, h::tl) -> ()
+    | (Jmp, h::tl) -> ()
+    | (J c, h::tl) -> ()
+    | (Cmpq, h::tl) -> ()
+    | (Set c, h::tl) -> ()
+    | (Callq, h::tl) -> ()
+    | (Retq, h::tl) -> ()
+    | _ -> ()
+    end
+  | _ -> ()
+  end
 
 (* Runs the machine until the rip register reaches a designated
    memory address. *)
