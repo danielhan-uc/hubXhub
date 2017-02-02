@@ -8,35 +8,541 @@ ocamlc.opt -c -I util -I x86 -o util/assert.cmi util/assert.mli # cached
 # Target: gradedtests.ml.depends, tags: { extension:ml, file:gradedtests.ml, ocaml, ocamldep, quiet }
 ocamldep.opt -modules gradedtests.ml > gradedtests.ml.depends # cached
 # Target: simulator.ml.depends, tags: { extension:ml, file:simulator.ml, ocaml, ocamldep, quiet }
-ocamldep.opt -modules simulator.ml > simulator.ml.depends # cached
+ocamldep.opt -modules simulator.ml > simulator.ml.depends
+# Target: int64_overflow.mli.depends, tags: { extension:mli, file:int64_overflow.mli, ocaml, ocamldep, quiet }
+ocamldep.opt -modules int64_overflow.mli > int64_overflow.mli.depends # cached
+# Target: int64_overflow.cmi, tags: { byte, compile, extension:mli, file:int64_overflow.mli, interf, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o int64_overflow.cmi int64_overflow.mli # cached
 # Target: x86/x86.ml.depends, tags: { extension:ml, file:x86/x86.ml, ocaml, ocamldep, quiet }
 ocamldep.opt -modules x86/x86.ml > x86/x86.ml.depends # cached
 # Target: x86/x86.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:x86/x86.cmo, file:x86/x86.ml, implem, ocaml, quiet }
 ocamlc.opt -c -I x86 -I util -o x86/x86.cmo x86/x86.ml # cached
 # Target: simulator.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:simulator.cmo, file:simulator.ml, implem, ocaml, quiet }
-ocamlc.opt -c -I x86 -I util -o simulator.cmo simulator.ml # cached
-# Target: gradedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:gradedtests.cmo, file:gradedtests.ml, implem, ocaml, quiet }
-ocamlc.opt -c -I x86 -I util -o gradedtests.cmo gradedtests.ml # cached
+ocamlc.opt -c -I x86 -I util -o simulator.cmo simulator.ml
++ ocamlc.opt -c -I x86 -I util -o simulator.cmo simulator.ml
+File "simulator.ml", line 308, characters 4-635:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+(Ind3 (Lit _, _)::_::_|Ind3 (Lbl _, _)::_|Reg _::_::_|
+(Imm _|Ind1 _|Ind2 _)::_|[])
+File "simulator.ml", line 321, characters 4-591:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+(Ind3 (Lit _, _)::_::_|Ind3 (Lbl _, _)::_|Reg _::_::_|
+(Imm _|Ind1 _|Ind2 _)::_|[])
+File "simulator.ml", line 345, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 346, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 348, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 356, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 358, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 360, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 370, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 371, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 373, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 377, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 378, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 380, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 387, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 389, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 391, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 398, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 400, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 402, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 410, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 411, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 413, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 417, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 418, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 420, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 427, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 429, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 431, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 438, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 440, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 442, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 450, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 451, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 456, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 457, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 465, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 466, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 475, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 476, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 478, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 486, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 488, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 490, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 500, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 501, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 503, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 511, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 513, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 515, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 766, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 768, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 772, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 774, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 778, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 780, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 784, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 786, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 835, characters 2-147:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+(InsFrag|Byte _)
+File "simulator.ml", line 1000, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1043, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1055, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1069, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1094, characters 6-13:
+Warning 26: unused variable checker.
 # Target: providedtests.ml.depends, tags: { extension:ml, file:providedtests.ml, ocaml, ocamldep, quiet }
 ocamldep.opt -modules providedtests.ml > providedtests.ml.depends # cached
+# Target: gradedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:gradedtests.cmo, file:gradedtests.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o gradedtests.cmo gradedtests.ml
 # Target: providedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:providedtests.cmo, file:providedtests.ml, implem, ocaml, quiet }
-ocamlc.opt -c -I x86 -I util -o providedtests.cmo providedtests.ml # cached
+ocamlc.opt -c -I x86 -I util -o providedtests.cmo providedtests.ml
 # Target: main.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:main.cmo, file:main.ml, implem, ocaml, quiet }
-ocamlc.opt -c -I x86 -I util -o main.cmo main.ml # cached
+ocamlc.opt -c -I x86 -I util -o main.cmo main.ml
 # Target: util/assert.ml.depends, tags: { extension:ml, file:util/assert.ml, ocaml, ocamldep, quiet }
 ocamldep.opt -modules util/assert.ml > util/assert.ml.depends # cached
 # Target: util/assert.cmx, tags: { compile, extension:cmx, extension:ml, file:util/assert.cmx, file:util/assert.ml, implem, native, ocaml, quiet }
 ocamlopt.opt -c -I util -I x86 -o util/assert.cmx util/assert.ml # cached
+# Target: int64_overflow.ml.depends, tags: { extension:ml, file:int64_overflow.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules int64_overflow.ml > int64_overflow.ml.depends # cached
+# Target: int64_overflow.cmx, tags: { compile, extension:cmx, extension:ml, file:int64_overflow.cmx, file:int64_overflow.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o int64_overflow.cmx int64_overflow.ml # cached
 # Target: x86/x86.cmx, tags: { compile, extension:cmx, extension:ml, file:x86/x86.cmx, file:x86/x86.ml, implem, native, ocaml, quiet }
 ocamlopt.opt -c -I x86 -I util -o x86/x86.cmx x86/x86.ml # cached
 # Target: simulator.cmx, tags: { compile, extension:cmx, extension:ml, file:simulator.cmx, file:simulator.ml, implem, native, ocaml, quiet }
-ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml # cached
+ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml
++ ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml
+File "simulator.ml", line 308, characters 4-635:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+(Ind3 (Lit _, _)::_::_|Ind3 (Lbl _, _)::_|Reg _::_::_|
+(Imm _|Ind1 _|Ind2 _)::_|[])
+File "simulator.ml", line 321, characters 4-591:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+(Ind3 (Lit _, _)::_::_|Ind3 (Lbl _, _)::_|Reg _::_::_|
+(Imm _|Ind1 _|Ind2 _)::_|[])
+File "simulator.ml", line 345, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 346, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 348, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 356, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 358, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 360, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 370, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 371, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 373, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 377, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 378, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 380, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 387, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 389, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 391, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 398, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 400, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 402, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 410, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 411, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 413, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 417, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 418, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 420, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 427, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 429, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 431, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 438, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 440, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 442, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 450, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 451, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 456, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 457, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 465, characters 34-39:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 466, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 475, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 476, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 478, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 486, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 488, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 490, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 500, characters 33-38:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 501, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 503, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 511, characters 29-34:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 513, characters 15-23:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 515, characters 27-32:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 766, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 768, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 772, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 774, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 778, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 780, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 784, characters 11-19:
+Warning 40: overflow was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 786, characters 23-28:
+Warning 40: value was selected from type Int64_overflow.t.
+It is not visible in the current scope, and will not 
+be selected if the type becomes unknown.
+File "simulator.ml", line 835, characters 2-147:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+(InsFrag|Byte _)
+File "simulator.ml", line 1000, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1043, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1055, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1069, characters 16-27:
+Warning 26: unused variable lbl_address.
+File "simulator.ml", line 1094, characters 6-13:
+Warning 26: unused variable checker.
 # Target: gradedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:gradedtests.cmx, file:gradedtests.ml, implem, native, ocaml, quiet }
-ocamlopt.opt -c -I x86 -I util -o gradedtests.cmx gradedtests.ml # cached
+ocamlopt.opt -c -I x86 -I util -o gradedtests.cmx gradedtests.ml
 # Target: providedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:providedtests.cmx, file:providedtests.ml, implem, native, ocaml, quiet }
-ocamlopt.opt -c -I x86 -I util -o providedtests.cmx providedtests.ml # cached
+ocamlopt.opt -c -I x86 -I util -o providedtests.cmx providedtests.ml
 # Target: main.cmx, tags: { compile, extension:cmx, extension:ml, file:main.cmx, file:main.ml, implem, native, ocaml, quiet }
-ocamlopt.opt -c -I x86 -I util -o main.cmx main.ml # cached
+ocamlopt.opt -c -I x86 -I util -o main.cmx main.ml
 # Target: main.native, tags: { dont_link_with, extension:native, file:main.native, link, native, ocaml, program, quiet }
-ocamlopt.opt x86/x86.cmx simulator.cmx util/assert.cmx gradedtests.cmx providedtests.cmx main.cmx -o main.native # cached
+ocamlopt.opt nums.cmxa int64_overflow.cmx x86/x86.cmx simulator.cmx util/assert.cmx gradedtests.cmx providedtests.cmx main.cmx -o main.native
 # Compilation successful.

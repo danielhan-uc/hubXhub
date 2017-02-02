@@ -164,7 +164,7 @@ let undefinedsym_test (p:prog) () =
 
 let machine_test (s:string) (n: int) (m: mach) (f:mach -> bool) () =
   for i=1 to n do step m done;
-  if (f m) then () else failwith ("expected " ^ s)
+  if (f m) then () else failwith ("expected " ^ s ^ "Rip " ^ (Int64.to_string m.regs.(rind Rax)))
 
 let program_test (p:prog) (ans:int64) () =
   let res = assemble p |> load |> run in
@@ -223,6 +223,7 @@ let mov_mr = test_machine
   [InsB0 (Movq, [~$42; ~%Rax]);InsFrag;InsFrag;InsFrag
   ;InsB0 (Movq, [~%Rax; stack_offset (-8L)]);InsFrag;InsFrag;InsFrag]
 
+(* let stack_offset (i: quad) : operand = Ind3 (Lit i, Rsp) *)
 
 let subq = test_machine
     [InsB0 (Subq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag
@@ -495,7 +496,7 @@ let medium_tests : suite = [
 
 let hard_tests : suite = [
   GradedTest ("Factorial", 10, [
-    ("fact6", program_test (factorial_rec 6) 720L);
+    ("fact6", program_test (factorial_rec 3) 6L);
   ]);
   GradedTest ("Hard", 10, []);
 ] 
