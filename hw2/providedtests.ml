@@ -2,7 +2,6 @@ open Assert
 open X86
 open Simulator
 open Asm
-open Simulator
 
 (* These tests are provided by you -- they will be graded manually *)
 
@@ -12,9 +11,8 @@ open Simulator
 let provided_tests : suite = [
   Test ("Student-Provided Big Test for Part III: Score recorded as PartIIITestCase", [
   ]);
+  ]
 
-  Test("Self-Instruction-Tests", instruction_tests)
-] 
 
 (*************************************************************)
 (******************* SELF_WRITTEN TESTS **********************)
@@ -89,6 +87,7 @@ let xorq_ = test_machine
     [InsB0 (Movq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Movq, [~$2; ~%Rbx]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Xorq, [~%Rax; ~%Rbx]);InsFrag;InsFrag;InsFrag
+    ]
 
 (************************ Bit Manipulation  ************************)
 
@@ -103,11 +102,7 @@ let shlq_ = test_machine
 let shrq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Shrq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)
-  [ ("lcm_8_12", program_test (lcm 8 12) 24L);
-    ("lcm_12_8", program_test (lcm 12 8) 24L);
-    ("lcm_prime", program_test (lcm 5 3) 15L);
-    ("lcm_large", program_test (lcm 80 90) 720L)                 
-  ]
+               
 
 (******************* Data-movement Instructions ********************)
 
@@ -215,15 +210,18 @@ let program_test (p:prog) (ans:int64) () =
 let taehantest =
 let lcm a b =
     [text "mod"
-  	[ Cmpq, [~%R12; ~%R11]
-  	; J Le, [~$$"exit1"]
-  	; Subq, [~%R12; ~%R11]
-  	; Jmp, [~$$"mod"]
-  	]
+  	  [
+            Cmpq, [~%R12; ~%R11]
+  	  ; J Lt, [~$$"exit1"]
+  	  ; Subq, [~%R12; ~%R11]
+          ; Jmp,  [~$$"mod"]
+  	  ]
     ; text "exit1"
-  	 [Retq, []]
+          [
+            Retq, []
+          ]
     ; text "lcm"
-  	   [
+  	  [
            Cmpq,  [~$0; ~%R09]
          ; J Eq,  [~$$"exit2"]
          ; Movq,  [~%R09; ~%R10]
@@ -232,34 +230,36 @@ let lcm a b =
   	 ; Callq, [~$$"mod"]			      
          ; Movq,  [~%R11; ~%R09]
   	 ; Movq,  [~%R10; ~%R08]
-  	 ; Jmp,   [~$$"gcd"]
+  	 ; Jmp,   [~$$"lcm"]
          ]
     ; text "div"
-           [
-           Movq, [~$0; ~%Rax]
-           ; Cmpq, [~%R08; ~%R13]
-           ; J Ge, [~$$"exit"]
-           ; Subq, [~%R13; ~%R08]
-           ; Addq, [~$1; ~%Rax]
-           ; Jmp,  [~$$"divide"]
-           ]
+         [
+           Cmpq,  [~$0; ~%R15]
+         ; J Eq,  [~$$"exit"]
+         ; Subq,  [~%R13; ~%R15]
+         ; Addq,  [~$1; ~%Rax]
+         ; Jmp,   [~$$"div"]
+         ]
     ; text "exit2"
-           [
+         [
            Movq,  [~%R08; ~%R13]
-           ; Imulq, [~%R09; ~%R08]
-           ; Callq, [~$$"div"]                  
-           ; Retq,  [] 
-           ]
+         ; Imulq, [~%R14; ~%R15]         
+         ; Movq,  [~$0; ~%Rax]
+         ; Jmp,   [~$$"div"]    
+         ]
     ; text "exit"
-           [
-             Retq, []
-           ]
+         [
+           Retq,  []
+         ]
     ; gtext "main"
-            [ Movq,  [~$a; ~%R08]
-  	    ; Movq,  [~$b; ~%R09]
-  	    ; Callq, [~$$"lcm"]
-            ; Retq,  []
-            ]
+         [
+           Movq,  [~$a; ~%R14]
+         ; Movq,  [~$b; ~%R15]
+         ; Movq,  [~%R14; ~%R08]
+         ; Movq,  [~%R15; ~%R09]
+         ; Callq, [~$$"lcm"]
+         ; Retq,  []
+         ]
     ]
   in
 
@@ -268,5 +268,3 @@ let lcm a b =
     ("lcm_prime", program_test (lcm 5 3) 15L);
     ("lcm_large", program_test (lcm 80 90) 720L)	       	       
   ]
-
-

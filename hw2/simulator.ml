@@ -1,4 +1,4 @@
-(* X86lite Simulator *)
+1(* X86lite Simulator *)
 
 (* See the documentation in the X86lite specification, available on the 
    course web pages, for a detailed explanation of the instruction
@@ -193,19 +193,53 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         if Int64.equal imm Int64.one then m.flags.fo <- false;
         if not(Int64.equal imm Int64.zero) then update_flags m num;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Imm (Lit imm1), Ind1 (Lit imm2)) ->
+        let memory_address = get_memory_address_from_address imm2 in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right dest_int (Int64.to_int imm1) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if Int64.equal imm1 Int64.one then m.flags.fo <- false;
+        if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+      | (Imm (Lit imm1), Ind2 (reg)) ->
+        let memory_address = get_memory_address m reg in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right dest_int (Int64.to_int imm1) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if Int64.equal imm1 Int64.one then m.flags.fo <- false;
+        if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
       | (Imm (Lit imm1), Ind3 (Lit imm2, reg)) ->
         let memory_address = get_memory_address m reg in
         let a : sbyte list = sbyte_list m.mem memory_address in
         let dest_int = int64_of_sbytes a in
         let dest_n_int = Int64.shift_right dest_int (Int64.to_int imm1) in
         insert_sbyte_to_memory (m) (memory_address) (imm2) (dest_n_int);
-        if Int64.equal dest_n_int Int64.one then m.flags.fo <- false;
+        if Int64.equal imm1 Int64.one then m.flags.fo <- false;
         if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
       | (Reg reg1, Reg reg2) ->
         let num = Int64.shift_right m.regs.(rind reg2) (Int64.to_int m.regs.(rind reg1)) in
         m.regs.(rind reg2) <- num;
         if Int64.equal m.regs.(rind reg1) Int64.one then m.flags.fo <- false;
         if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m num;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Reg reg1, Ind1 (Lit imm)) ->
+        let memory_address = get_memory_address_from_address imm in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right dest_int (Int64.to_int m.regs.(rind reg1)) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if Int64.equal m.regs.(rind reg1) Int64.one then m.flags.fo <- false;
+        if not(Int64.equal m.regs.(rind reg1) Int64.one) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Reg reg1, Ind2 (reg)) ->
+        let memory_address = get_memory_address m reg in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right dest_int (Int64.to_int m.regs.(rind reg1)) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if Int64.equal m.regs.(rind reg1) Int64.one then m.flags.fo <- false;
+        if not(Int64.equal m.regs.(rind reg1) Int64.one) then update_flags m dest_n_int;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Reg reg1, Ind3 (Lit imm, reg)) ->
         let memory_address = get_memory_address m reg in
@@ -215,9 +249,6 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         insert_sbyte_to_memory (m) (memory_address) (imm) (dest_n_int);
         if Int64.equal m.regs.(rind reg1) Int64.one then m.flags.fo <- false;
         if not(Int64.equal m.regs.(rind reg1) Int64.one) then update_flags m dest_n_int;
-        (* for i = 0 to 7 do
-          m.mem.(Int64.to_int(Int64.add (Int64.of_int (memory_address + i)) (imm))) <- List.nth (sbytes_of_int64 dest_n_int) i
-        done; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | _ -> ()
       end
@@ -225,11 +256,31 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
       begin match (amt, dest) with
       | (Imm (Lit imm), Reg reg) -> 
         let rv = m.regs.(rind reg) in
-        let num = Int64.shift_right_logical rv (Int64.to_int imm) in
+        let num = Int64.shift_left rv (Int64.to_int imm) in
         m.regs.(rind reg) <- num;
-        if not(Int64.equal (Int64.logand (Int64.shift_right_logical rv 62) Int64.one) (Int64.shift_right_logical rv 63)) 
-          && (Int64.equal imm Int64.one) then m.flags.fo <- false;
+        if (Int64.equal (Int64.shift_right_logical rv 63) Int64.one) 
+          && (Int64.equal imm Int64.one) then m.flags.fo <- true;
         if not(Int64.equal imm Int64.zero) then update_flags m num;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Imm (Lit imm1), Ind1 (Lit imm2)) ->
+        let memory_address = get_memory_address_from_address imm2 in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right_logical dest_int (Int64.to_int imm1) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if (Int64.equal  (Int64.shift_right_logical dest_int 63) Int64.one) 
+          && (Int64.equal imm1 Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Imm (Lit imm1), Ind2 (reg)) ->
+        let memory_address = get_memory_address m reg in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right_logical dest_int (Int64.to_int imm1) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if (Int64.equal  (Int64.shift_right_logical dest_int 63) Int64.one)  
+          && (Int64.equal imm1 Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Imm (Lit imm1), Ind3 (Lit imm2, reg)) ->
         let memory_address = get_memory_address m reg in
@@ -237,16 +288,37 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         let dest_int = int64_of_sbytes a in
         let dest_n_int = Int64.shift_right_logical dest_int (Int64.to_int imm1) in
         insert_sbyte_to_memory (m) (memory_address) (imm2) (dest_n_int);
-        if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
-          && (Int64.equal imm1 Int64.one) then m.flags.fo <- false;
+        if (Int64.equal  (Int64.shift_right_logical dest_int 63) Int64.one)  
+          && (Int64.equal imm1 Int64.one) then m.flags.fo <- true;
         if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Reg reg1, Reg reg2) ->
         let rv = m.regs.(rind reg2) in
         let num = Int64.shift_right_logical rv (Int64.to_int m.regs.(rind reg1)) in
         m.regs.(rind reg2) <- num;
-        if not(Int64.equal (Int64.logand (Int64.shift_right_logical rv 62) Int64.one) (Int64.shift_right_logical rv 63)) 
-          && (Int64.equal m.regs.(rind reg1 ) Int64.one) then m.flags.fo <- false;
+        if (Int64.equal (Int64.shift_right_logical rv 63) Int64.one) 
+          && (Int64.equal m.regs.(rind reg1 ) Int64.one) then m.flags.fo <- true;
         if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m num;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Reg reg1, Ind1 (Lit imm)) ->
+        let memory_address = get_memory_address_from_address imm in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right_logical dest_int (Int64.to_int m.regs.(rind reg1)) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if (Int64.equal  (Int64.shift_right_logical dest_int 63) Int64.one)  
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Reg reg1, Ind2 (reg)) ->
+        let memory_address = get_memory_address m reg in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_right_logical dest_int (Int64.to_int m.regs.(rind reg1)) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if (Int64.equal  (Int64.shift_right_logical dest_int 63) Int64.one) 
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m dest_n_int;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Reg reg1, Ind3 (Lit imm, reg)) ->
         let memory_address = get_memory_address m reg in
@@ -254,12 +326,9 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         let dest_int = int64_of_sbytes a in
         let dest_n_int = Int64.shift_right_logical dest_int (Int64.to_int m.regs.(rind reg1)) in
         insert_sbyte_to_memory (m) (memory_address) (imm) (dest_n_int);
-        if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
-          && (Int64.equal imm Int64.one) then m.flags.fo <- false;
+        if (Int64.equal  (Int64.shift_right_logical dest_int 63) Int64.one)  
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
         if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m dest_n_int;
-        (* for i = 0 to 7 do
-          m.mem.(Int64.to_int(Int64.add (Int64.of_int (memory_address + i)) (imm))) <- List.nth (sbytes_of_int64 dest_n_int) i
-        done; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | _ -> ()
       end
@@ -270,8 +339,28 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         let num = Int64.shift_left rv (Int64.to_int imm) in
         m.regs.(rind reg) <- num;
         if not(Int64.equal (Int64.logand (Int64.shift_right_logical rv 62) Int64.one) (Int64.shift_right_logical rv 63)) 
-          && (Int64.equal imm Int64.one) then m.flags.fo <- false;
+          && (Int64.equal imm Int64.one) then m.flags.fo <- true;
         if not(Int64.equal imm Int64.zero) then update_flags m num;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Imm (Lit imm1), Ind1 (Lit imm2)) ->
+        let memory_address = get_memory_address_from_address imm2 in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_left dest_int (Int64.to_int imm1) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
+          && (Int64.equal imm1 Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+       | (Imm (Lit imm1), Ind2 (reg)) ->
+        let memory_address = get_memory_address m reg in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_left dest_int (Int64.to_int imm1) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
+          && (Int64.equal imm1 Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Imm (Lit imm1), Ind3 (Lit imm2, reg)) ->
         let memory_address = get_memory_address m reg in
@@ -280,15 +369,36 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         let dest_n_int = Int64.shift_left dest_int (Int64.to_int imm1) in
         insert_sbyte_to_memory (m) (memory_address) (imm2) (dest_n_int);
         if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
-          && (Int64.equal imm1 Int64.one) then m.flags.fo <- false;
+          && (Int64.equal imm1 Int64.one) then m.flags.fo <- true;
         if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Reg reg1, Reg reg2) ->
-      let rv = m.regs.(rind reg2) in
+        let rv = m.regs.(rind reg2) in
         let num = Int64.shift_left rv (Int64.to_int m.regs.(rind reg1)) in
         m.regs.(rind reg2) <- num;
         if not(Int64.equal (Int64.logand (Int64.shift_right_logical rv 62) Int64.one) (Int64.shift_right_logical rv 63)) 
-          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- false;
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
         if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m num;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Reg reg1, Ind1 (Lit imm)) ->
+        let memory_address = get_memory_address_from_address imm in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_left dest_int (Int64.to_int m.regs.(rind reg1)) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+      | (Reg reg1, Ind2 (reg)) ->
+        let memory_address = get_memory_address m reg in
+        let a : sbyte list = sbyte_list m.mem memory_address in
+        let dest_int = int64_of_sbytes a in
+        let dest_n_int = Int64.shift_left dest_int (Int64.to_int m.regs.(rind reg1)) in
+        insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
+        if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
+        if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m dest_n_int;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Reg reg1, Ind3 (Lit imm, reg)) ->
         let memory_address = get_memory_address m reg in
@@ -297,11 +407,8 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         let dest_n_int = Int64.shift_left dest_int (Int64.to_int m.regs.(rind reg1)) in
         insert_sbyte_to_memory (m) (memory_address) (imm) (dest_n_int);
         if not(Int64.equal (Int64.logand (Int64.shift_right_logical dest_int 62) Int64.one) (Int64.shift_right_logical dest_int 63)) 
-          && (Int64.equal imm Int64.one) then m.flags.fo <- false;
+          && (Int64.equal m.regs.(rind reg1) Int64.one) then m.flags.fo <- true;
         if not(Int64.equal m.regs.(rind reg1) Int64.zero) then update_flags m dest_n_int;
-        (* for i = 0 to 7 do
-          m.mem.(Int64.to_int(Int64.add (Int64.of_int (memory_address + i)) (imm))) <- List.nth (sbytes_of_int64 dest_n_int) i
-        done; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | _ -> ()
       end
@@ -313,6 +420,20 @@ let set_step (m: mach) (c: cnd) (op: operand list) : unit =
     begin match op with
     | [Reg r] ->
       m.regs.(rind r) <- Int64.add (Int64.logand m.regs.(rind r) (Int64.of_int (-256))) Int64.one;
+      m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+    | [Ind1 (Lit imm)] ->
+      let memory_address = get_memory_address_from_address imm in
+      let a : sbyte list = sbyte_list m.mem memory_address in
+      let dest_int = int64_of_sbytes a in
+      let data = Int64.add (Int64.logand dest_int (Int64.of_int (-256))) Int64.one in
+      insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (data);
+      m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+    | [Ind2 (reg)] ->
+      let memory_address = get_memory_address m reg in
+      let a : sbyte list = sbyte_list m.mem memory_address in
+      let dest_int = int64_of_sbytes a in
+      let data = Int64.add (Int64.logand dest_int (Int64.of_int (-256))) Int64.one in
+      insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (data);
       m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
     | [Ind3 (Lit imm, reg)] ->
       let memory_address = get_memory_address m reg in
@@ -327,6 +448,20 @@ let set_step (m: mach) (c: cnd) (op: operand list) : unit =
     begin match op with
     | [Reg r] ->
       m.regs.(rind r) <- Int64.logand m.regs.(rind r) (Int64.of_int (-256));
+      m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+    | [Ind1 (Lit imm)] ->
+      let memory_address = get_memory_address_from_address imm in
+      let a : sbyte list = sbyte_list m.mem memory_address in
+      let dest_int = int64_of_sbytes a in
+      let data = Int64.logand dest_int (Int64.of_int (-256)) in
+      insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (data);
+      m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+    | [Ind2 (reg)] ->
+      let memory_address = get_memory_address m reg in
+      let a : sbyte list = sbyte_list m.mem memory_address in
+      let dest_int = int64_of_sbytes a in
+      let data = Int64.logand dest_int (Int64.of_int (-256)) in
+      insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (data);
       m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
     | [Ind3 (Lit imm, reg)] ->
       let memory_address = get_memory_address m reg in
