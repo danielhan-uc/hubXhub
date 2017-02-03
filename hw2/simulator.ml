@@ -2259,7 +2259,7 @@ let jmp_step (m: mach) (op: operand list) : unit =
   | [Imm (Lit imm)] ->
     m.regs.(rind Rip) <- imm;
   | [Reg reg] ->
-     m.regs.(rind Rip) <- m.regs.(rind reg);
+    m.regs.(rind Rip) <- m.regs.(rind reg);
   | [Ind1 (Lit imm)] ->
     let memory_address = get_memory_address_from_address imm in
     let a : sbyte list = sbyte_list m.mem memory_address in
@@ -2444,7 +2444,15 @@ let translate_cur_ins (st: (lbl, int64) Hashtbl.t) (input_text_seg: sbyte list)(
     | (Popq, oplist) ->
         text_seg := !text_seg @ sbytes_of_ins cur_ins
     | (Leaq, oplist) ->
-        text_seg := !text_seg @ sbytes_of_ins cur_ins
+      begin match oplist with
+        | [Ind1 (Lbl l); dest] ->
+            let lbl_address = try
+              Hashtbl.find st l
+            with Not_found -> raise (Undefined_sym l) in
+            text_seg := !text_seg @ [InsB0 (Leaq, [Ind1 (Lit (lbl_address)); dest])] @ [InsFrag; InsFrag; InsFrag] 
+        | _ ->
+            text_seg := !text_seg @ sbytes_of_ins cur_ins
+        end
     | (Incq, oplist) ->
         text_seg := !text_seg @ sbytes_of_ins cur_ins
     | (Decq, oplist) ->

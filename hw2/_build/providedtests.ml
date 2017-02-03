@@ -25,8 +25,9 @@ let test_machine (bs: sbyte list): mach =
 
 let machine_test (s:string) (n: int) (m: mach) (f:mach -> bool) () =
   for i=1 to n do step m done;
+  Printf.printf "%s Flags %B, %B, %B \n" s m.flags.fo m.flags.fs m.flags.fz;
   if (f m) then () else failwith ("expected " ^ s ^ "Rip " ^ (Int64.to_string m.regs.(rind Rax)))
-
+ (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
 let negq_ = test_machine
     [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Negq, [~%Rax]);InsFrag;InsFrag;InsFrag
@@ -87,54 +88,15 @@ let xorq_ = test_machine
 
 let sarq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Sarq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)
+    ;InsB0 (Sarq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag]
 
 let shlq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Shlq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
+    ;InsB0 (Shlq, [~$10; ~%Rax]);InsFrag;InsFrag;InsFrag]
 
 let shrq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Shrq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)
-
-(******************* Data-movement Instructions ********************)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
-
-(********* Control-flow and Condition Instructions *****************)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
-
-let incq_ = test_machine
-    [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Incq, [~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
+    ;InsB0 (Shrq, [~$6; ~%Rax]);InsFrag;InsFrag;InsFrag]
 
 (*************************************************************)
 (******************* SELF_WRITTEN TESTS **********************)
@@ -181,15 +143,18 @@ let instruction_tests = [
   );
 
   ("sarq_", machine_test "test" 3 sarq_
-    (fun m -> m.regs.(rind Rax) = 1L)
+    (fun m -> m.regs.(rind Rax) = 0L
+           && m.flags = {fo = false; fs = false; fz = true})
   );
 
   ("shlq_", machine_test "test" 2 shlq_
-    (fun m -> m.regs.(rind Rax) = 6L)
+    (fun m -> m.regs.(rind Rax) = Int64.of_int 3072
+           && m.flags = {fo = false; fs = false; fz = false})
   );
 
   ("shrq_", machine_test "test" 3 shrq_
-    (fun m -> m.regs.(rind Rax) = 1L)
+    (fun m -> m.regs.(rind Rax) = 0L
+           && m.flags = {fo = false; fs = false; fz = true})
   );
 ]
 

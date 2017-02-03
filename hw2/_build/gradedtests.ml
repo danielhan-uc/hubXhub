@@ -11,7 +11,6 @@ open Asm
 (* These tests will be used to grade your assignment *)
 
 (* Example Programs *)
-
 let helloworld = [ text "foo"
                             [ Xorq, [~%Rax; ~%Rax]
                             ; Movq, [~$100; ~%Rax]
