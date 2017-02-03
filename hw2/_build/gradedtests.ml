@@ -11,7 +11,6 @@ open Asm
 (* These tests will be used to grade your assignment *)
 
 (* Example Programs *)
-
 let helloworld = [ text "foo"
                             [ Xorq, [~%Rax; ~%Rax]
                             ; Movq, [~$100; ~%Rax]
@@ -203,8 +202,6 @@ let add = test_machine
   ;InsB0 (Addq, [~%Rbx; stack_offset 0L]);InsFrag;InsFrag;InsFrag
   ]
 
-
-
 let functionality_tests = [
   ("mov_ri", machine_test "rax=42" 1 mov_ri
     (fun m -> m.regs.(rind Rax) = 42L)
@@ -223,13 +220,6 @@ let mov_mr = test_machine
   [InsB0 (Movq, [~$42; ~%Rax]);InsFrag;InsFrag;InsFrag
   ;InsB0 (Movq, [~%Rax; stack_offset (-8L)]);InsFrag;InsFrag;InsFrag]
 
-(* let stack_offset (i: quad) : operand = Ind3 (Lit i, Rsp) *)
-
-let subq = test_machine
-    [InsB0 (Subq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Subq, [~%Rax; ~%Rbx]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Subq, [~%Rbx; stack_offset 0L]);InsFrag;InsFrag;InsFrag]
-
 let andq = test_machine
     [InsB0 (Movq, [~$2; ~%Rax]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Movq, [~$3; ~%Rbx]);InsFrag;InsFrag;InsFrag
@@ -241,6 +231,10 @@ let andq = test_machine
     ;InsB0 (Andq, [stack_offset 0L; ~%Rcx]);InsFrag;InsFrag;InsFrag
     ]
 
+let subq = test_machine
+    [InsB0 (Subq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Subq, [~%Rax; ~%Rbx]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Subq, [~%Rbx; stack_offset 0L]);InsFrag;InsFrag;InsFrag]
 
 let negq = test_machine
     [InsB0 (Movq, [~$42; ~%Rax]);InsFrag;InsFrag;InsFrag
