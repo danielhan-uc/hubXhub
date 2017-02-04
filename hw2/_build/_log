@@ -6,7 +6,7 @@ ocamldep.opt -modules util/assert.mli > util/assert.mli.depends # cached
 # Target: util/assert.cmi, tags: { byte, compile, extension:mli, file:util/assert.mli, interf, ocaml, quiet }
 ocamlc.opt -c -I util -I x86 -o util/assert.cmi util/assert.mli # cached
 # Target: gradedtests.ml.depends, tags: { extension:ml, file:gradedtests.ml, ocaml, ocamldep, quiet }
-ocamldep.opt -modules gradedtests.ml > gradedtests.ml.depends
+ocamldep.opt -modules gradedtests.ml > gradedtests.ml.depends # cached
 # Target: simulator.ml.depends, tags: { extension:ml, file:simulator.ml, ocaml, ocamldep, quiet }
 ocamldep.opt -modules simulator.ml > simulator.ml.depends # cached
 # Target: int64_overflow.mli.depends, tags: { extension:mli, file:int64_overflow.mli, ocaml, ocamldep, quiet }
@@ -19,12 +19,12 @@ ocamldep.opt -modules x86/x86.ml > x86/x86.ml.depends # cached
 ocamlc.opt -c -I x86 -I util -o x86/x86.cmo x86/x86.ml # cached
 # Target: simulator.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:simulator.cmo, file:simulator.ml, implem, ocaml, quiet }
 ocamlc.opt -c -I x86 -I util -o simulator.cmo simulator.ml # cached
-# Target: providedtests.ml.depends, tags: { extension:ml, file:providedtests.ml, ocaml, ocamldep, quiet }
-ocamldep.opt -modules providedtests.ml > providedtests.ml.depends # cached
-# Target: providedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:providedtests.cmo, file:providedtests.ml, implem, ocaml, quiet }
-ocamlc.opt -c -I x86 -I util -o providedtests.cmo providedtests.ml # cached
 # Target: gradedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:gradedtests.cmo, file:gradedtests.ml, implem, ocaml, quiet }
-ocamlc.opt -c -I x86 -I util -o gradedtests.cmo gradedtests.ml
+ocamlc.opt -c -I x86 -I util -o gradedtests.cmo gradedtests.ml # cached
+# Target: providedtests.ml.depends, tags: { extension:ml, file:providedtests.ml, ocaml, ocamldep, quiet }
+ocamldep.opt -modules providedtests.ml > providedtests.ml.depends
+# Target: providedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:providedtests.cmo, file:providedtests.ml, implem, ocaml, quiet }
+ocamlc.opt -c -I x86 -I util -o providedtests.cmo providedtests.ml
 # Target: main.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:main.cmo, file:main.ml, implem, ocaml, quiet }
 ocamlc.opt -c -I x86 -I util -o main.cmo main.ml
 # Target: util/assert.ml.depends, tags: { extension:ml, file:util/assert.ml, ocaml, ocamldep, quiet }
@@ -38,11 +38,14 @@ ocamlopt.opt -c -I x86 -I util -o int64_overflow.cmx int64_overflow.ml # cached
 # Target: x86/x86.cmx, tags: { compile, extension:cmx, extension:ml, file:x86/x86.cmx, file:x86/x86.ml, implem, native, ocaml, quiet }
 ocamlopt.opt -c -I x86 -I util -o x86/x86.cmx x86/x86.ml # cached
 # Target: simulator.cmx, tags: { compile, extension:cmx, extension:ml, file:simulator.cmx, file:simulator.ml, implem, native, ocaml, quiet }
-ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml # cached
-# Target: providedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:providedtests.cmx, file:providedtests.ml, implem, native, ocaml, quiet }
-ocamlopt.opt -c -I x86 -I util -o providedtests.cmx providedtests.ml # cached
+ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml
++ ocamlopt.opt -c -I x86 -I util -o simulator.cmx simulator.ml
+File "simulator.ml", line 2715, characters 6-13:
+Warning 26: unused variable checker.
 # Target: gradedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:gradedtests.cmx, file:gradedtests.ml, implem, native, ocaml, quiet }
 ocamlopt.opt -c -I x86 -I util -o gradedtests.cmx gradedtests.ml
+# Target: providedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:providedtests.cmx, file:providedtests.ml, implem, native, ocaml, quiet }
+ocamlopt.opt -c -I x86 -I util -o providedtests.cmx providedtests.ml
 # Target: main.cmx, tags: { compile, extension:cmx, extension:ml, file:main.cmx, file:main.ml, implem, native, ocaml, quiet }
 ocamlopt.opt -c -I x86 -I util -o main.cmx main.ml
 # Target: main.native, tags: { dont_link_with, extension:native, file:main.native, link, native, ocaml, program, quiet }

@@ -1,4 +1,4 @@
-1(* X86lite Simulator *)
+(* X86lite Simulator *)
 
 (* See the documentation in the X86lite specification, available on the 
    course web pages, for a detailed explanation of the instruction
@@ -201,6 +201,7 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
         if Int64.equal imm1 Int64.one then m.flags.fo <- false;
         if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Imm (Lit imm1), Ind2 (reg)) ->
         let memory_address = get_memory_address m reg in
         let a : sbyte list = sbyte_list m.mem memory_address in
@@ -209,6 +210,7 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (dest_n_int);
         if Int64.equal imm1 Int64.one then m.flags.fo <- false;
         if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Imm (Lit imm1), Ind3 (Lit imm2, reg)) ->
         let memory_address = get_memory_address m reg in
         let a : sbyte list = sbyte_list m.mem memory_address in
@@ -217,6 +219,7 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
         insert_sbyte_to_memory (m) (memory_address) (imm2) (dest_n_int);
         if Int64.equal imm1 Int64.one then m.flags.fo <- false;
         if not(Int64.equal imm1 Int64.zero) then update_flags m dest_n_int;
+        m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Reg reg1, Reg reg2) ->
         let num = Int64.shift_right m.regs.(rind reg2) (Int64.to_int m.regs.(rind reg1)) in
         m.regs.(rind reg2) <- num;
@@ -256,7 +259,7 @@ let bit_manipulation_step (m: mach) (o: opcode) (op: operand list) : unit =
       begin match (amt, dest) with
       | (Imm (Lit imm), Reg reg) -> 
         let rv = m.regs.(rind reg) in
-        let num = Int64.shift_left rv (Int64.to_int imm) in
+        let num = Int64.shift_right_logical rv (Int64.to_int imm) in
         m.regs.(rind reg) <- num;
         if (Int64.equal (Int64.shift_right_logical rv 63) Int64.one) 
           && (Int64.equal imm Int64.one) then m.flags.fo <- true;
@@ -489,7 +492,6 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         if num.overflow then m.flags.fo <- true
         else m.flags.fo <- false;
         update_flags m num.value;
-        (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | Ind1 (Lit imm) -> 
         let memory_address = get_memory_address_from_address imm in
@@ -502,8 +504,6 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         if num.overflow then m.flags.fo <- true
         else m.flags.fo <- false;
         update_flags m num.value;
-        (* Printf.printf "Number %Ld " num.value; *)
-        (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | Ind2 (reg) ->
         let memory_address = get_memory_address m reg in
@@ -516,8 +516,6 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         if num.overflow then m.flags.fo <- true
         else m.flags.fo <- false;
         update_flags m num.value;
-        (* Printf.printf "Number %Ld " num.value; *)
-        (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | Ind3 (Lit imm, reg) -> 
         let memory_address = get_memory_address m reg in
@@ -530,8 +528,6 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         if num.overflow then m.flags.fo <- true
         else m.flags.fo <- false;
         update_flags m num.value;
-        (* Printf.printf "Number %Ld " num.value; *)
-        (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | _ -> ()
       end
@@ -627,7 +623,6 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | (Ind1(Lit imm), Reg reg2) ->
         let memory_address = get_memory_address_from_address imm in
-        Printf.printf("asfd");
         let a : sbyte list = sbyte_list m.mem memory_address in
         let dest_int = int64_of_sbytes a in
         let open Int64_overflow in
@@ -850,7 +845,7 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         else m.flags.fo <- false;
         update_flags m num.value;
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
-       | (Reg reg1, Ind1(Lit imm)) ->
+      | (Reg reg1, Ind1(Lit imm)) ->
         let memory_address = get_memory_address_from_address imm in
         let a : sbyte list = sbyte_list m.mem memory_address in
         let dest_int = int64_of_sbytes a in
@@ -1113,7 +1108,6 @@ let arithmetic_step (m: mach) (o: opcode) (op: operand list) : unit =
         if num.overflow then m.flags.fo <- true
         else m.flags.fo <- false;
         update_flags m num.value;
-        (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
         m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
       | Ind1 (Lit imm) -> 
         let memory_address = get_memory_address_from_address imm in
@@ -2039,19 +2033,19 @@ let pushq_step (m: mach) (op: operand list) : unit =
     let source_address = get_memory_address_from_address imm in
     let memory_address = get_memory_address m Rsp in
     insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (int64_of_sbytes (sbyte_list m.mem source_address));
-    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 8);
+    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4);
   | [Ind2 (reg)] ->
     m.regs.(rind Rsp) <- Int64.sub (m.regs.(rind Rsp)) (Int64.of_int 8);
     let source_address = get_memory_address m reg in
     let memory_address = get_memory_address m Rsp in
     insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (int64_of_sbytes (sbyte_list m.mem source_address));
-    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 8);
+    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4);
   | [Ind3 (Lit imm, reg)] ->
     m.regs.(rind Rsp) <- Int64.sub (m.regs.(rind Rsp)) (Int64.of_int 8);
     let source_address = (get_memory_address m reg) + (Int64.to_int imm) in
     let memory_address = get_memory_address m Rsp in
     insert_sbyte_to_memory (m) (memory_address) (Int64.zero) (int64_of_sbytes (sbyte_list m.mem source_address));
-    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 8);
+    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4);
   | _ -> ()
   end
 
@@ -2238,13 +2232,22 @@ let cmpq_step (m: mach) (op: operand list) : unit =
     else m.flags.fo <- false;
     update_flags m num.value;
     m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+  | [Ind1(Lit imm); Imm(Lit imm2)] ->
+    let memory_address = get_memory_address_from_address imm in
+    let a : sbyte list = sbyte_list m.mem memory_address in
+    let dest_int = int64_of_sbytes a in
+    let open Int64_overflow in
+    let num = sub imm2 dest_int in 
+    if num.overflow then m.flags.fo <- true
+    else m.flags.fo <- false;
+    update_flags m num.value;
+    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
   | [Ind1(Lit imm); Reg reg2] ->
     let memory_address = get_memory_address_from_address imm in
     let a : sbyte list = sbyte_list m.mem memory_address in
     let dest_int = int64_of_sbytes a in
     let open Int64_overflow in
     let num = sub m.regs.(rind reg2) dest_int in 
-    m.regs.(rind reg2) <- num.value;
     if num.overflow then m.flags.fo <- true
     else m.flags.fo <- false;
     update_flags m num.value;
@@ -2288,6 +2291,16 @@ let cmpq_step (m: mach) (op: operand list) : unit =
     else m.flags.fo <- false;
     update_flags m num.value;
     m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+  | [Ind2(reg1); Imm (Lit imm)] ->
+    let memory_address = get_memory_address m reg1 in
+    let a : sbyte list = sbyte_list m.mem memory_address in
+    let dest_int = int64_of_sbytes a in
+    let open Int64_overflow in
+    let num = sub imm dest_int in 
+    if num.overflow then m.flags.fo <- true
+    else m.flags.fo <- false;
+    update_flags m num.value;
+    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4);
   | [Ind2(reg1); Reg reg2] ->
     let memory_address = get_memory_address m reg1 in
     let a : sbyte list = sbyte_list m.mem memory_address in
@@ -2333,6 +2346,16 @@ let cmpq_step (m: mach) (op: operand list) : unit =
     let dest_int2 = int64_of_sbytes a2 in
     let open Int64_overflow in
     let num = sub dest_int2 dest_int1 in 
+    if num.overflow then m.flags.fo <- true
+    else m.flags.fo <- false;
+    update_flags m num.value;
+    m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 4)
+  | [Ind3(Lit imm, reg1); Imm(Lit imm2)] ->
+    let memory_address = (get_memory_address m reg1) + (Int64.to_int imm) in
+    let a : sbyte list = sbyte_list m.mem memory_address in
+    let dest_int = int64_of_sbytes a in
+    let open Int64_overflow in
+    let num = sub imm2 dest_int in 
     if num.overflow then m.flags.fo <- true
     else m.flags.fo <- false;
     update_flags m num.value;
@@ -2471,7 +2494,7 @@ let step (m:mach) : unit =
     | (Retq, _) -> retq_step m
     end
   | InsFrag -> ()
-  | Byte c -> m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 1) (**)
+  | Byte c -> m.regs.(rind Rip) <- Int64.add (m.regs.(rind Rip)) (Int64.of_int 1)
   end
 
 
@@ -2479,7 +2502,7 @@ let step (m:mach) : unit =
 (* Runs the machine until the rip register reaches a designated
    memory address. *)
 let run (m:mach) : int64 =
-  while m.regs.(rind Rip) <> exit_addr do step m done;
+  while (m.regs.(rind Rip) <> exit_addr) do step m done;
   m.regs.(rind Rax)
 
 (* assembling and linking --------------------------------------------------- *)
@@ -2566,6 +2589,11 @@ let translate_cur_ins (st: (lbl, int64) Hashtbl.t) (input_text_seg: sbyte list)(
     begin match cur_ins with
     | (Movq, oplist) ->
         begin match oplist with
+        | [Imm (Lbl l); dest] ->
+            let lbl_address = try
+              Hashtbl.find st l
+            with Not_found -> raise (Undefined_sym l) in
+            text_seg := !text_seg @ [InsB0 (Movq, [Imm (Lit (lbl_address)); dest])] @ [InsFrag; InsFrag; InsFrag]
         | [Ind1 (Lbl l); dest] ->
             let lbl_address = try
               Hashtbl.find st l
@@ -2580,11 +2608,16 @@ let translate_cur_ins (st: (lbl, int64) Hashtbl.t) (input_text_seg: sbyte list)(
         text_seg := !text_seg @ sbytes_of_ins cur_ins
     | (Leaq, oplist) ->
       begin match oplist with
+        | [Imm (Lbl l); dest] ->
+            let lbl_address = try
+              Hashtbl.find st l
+            with Not_found -> raise (Undefined_sym l) in
+            text_seg := !text_seg @ [InsB0 (Leaq, [Imm (Lit (lbl_address)); dest])] @ [InsFrag; InsFrag; InsFrag]
         | [Ind1 (Lbl l); dest] ->
             let lbl_address = try
               Hashtbl.find st l
             with Not_found -> raise (Undefined_sym l) in
-            text_seg := !text_seg @ [InsB0 (Leaq, [Ind1 (Lit (lbl_address)); dest])] @ [InsFrag; InsFrag; InsFrag] 
+            text_seg := !text_seg @ [InsB0 (Leaq, [Ind1 (Lit (lbl_address)); dest])] @ [InsFrag; InsFrag; InsFrag]
         | _ ->
             text_seg := !text_seg @ sbytes_of_ins cur_ins
         end
@@ -2620,7 +2653,12 @@ let translate_cur_ins (st: (lbl, int64) Hashtbl.t) (input_text_seg: sbyte list)(
             let lbl_address = try
               Hashtbl.find st l
             with Not_found -> raise (Undefined_sym l) in
-            text_seg := !text_seg @ [InsB0 (Jmp, [Imm (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag] 
+            text_seg := !text_seg @ [InsB0 (Jmp, [Imm (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag]
+        | [Ind1 (Lbl l)] ->
+            let lbl_address = try
+              Hashtbl.find st l
+            with Not_found -> raise (Undefined_sym l) in
+            text_seg := !text_seg @ [InsB0 (Jmp, [Ind1 (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag]
         | _ ->
             text_seg := !text_seg @ sbytes_of_ins cur_ins 
         end
@@ -2631,6 +2669,11 @@ let translate_cur_ins (st: (lbl, int64) Hashtbl.t) (input_text_seg: sbyte list)(
               Hashtbl.find st l
             with Not_found -> raise (Undefined_sym l) in
             text_seg := !text_seg @ [InsB0 (J cc, [Imm (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag] 
+        | [Ind1 (Lbl l)] ->
+            let lbl_address = try
+              Hashtbl.find st l
+            with Not_found -> raise (Undefined_sym l) in
+            text_seg := !text_seg @ [InsB0 (J cc, [Ind1 (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag] 
         | _ ->
             text_seg := !text_seg @ sbytes_of_ins cur_ins 
         end
@@ -2645,6 +2688,11 @@ let translate_cur_ins (st: (lbl, int64) Hashtbl.t) (input_text_seg: sbyte list)(
               Hashtbl.find st l
             with Not_found -> raise (Undefined_sym l) in
             text_seg := !text_seg @ [InsB0 (Callq, [Imm (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag] 
+        | [Ind1 (Lbl l)] -> 
+            let lbl_address = try
+              Hashtbl.find st l
+            with Not_found -> raise (Undefined_sym l) in
+            text_seg := !text_seg @ [InsB0 (Callq, [Ind1 (Lit (lbl_address))])] @ [InsFrag; InsFrag; InsFrag] 
         | _ ->
             text_seg := !text_seg @ sbytes_of_ins cur_ins
         end

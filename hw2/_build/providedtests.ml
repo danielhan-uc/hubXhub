@@ -3,11 +3,6 @@ open X86
 open Simulator
 open Asm
 
-(* These tests are provided by you -- they will be graded manually *)
-
-(* You should also add additional test cases here to help you   *)
-(* debug your program.                                          *)
-
 (*************************************************************)
 (******************* SELF_WRITTEN TESTS **********************)
 (*************************************************************)
@@ -25,9 +20,11 @@ let test_machine (bs: sbyte list): mach =
 
 let machine_test (s:string) (n: int) (m: mach) (f:mach -> bool) () =
   for i=1 to n do step m done;
-  Printf.printf "%s Flags %B, %B, %B \n" s m.flags.fo m.flags.fs m.flags.fz;
-  if (f m) then () else failwith ("expected " ^ s ^ "Rip " ^ (Int64.to_string m.regs.(rind Rax)))
- (* Printf.printf "Flags %B, %B, %B " m.flags.fo m.flags.fs m.flags.fz; *)
+  Printf.printf "test %s FO: %b, FS: %b, FZ: %b\n" s m.flags.fo m.flags.fs m.flags.fz;
+  if (f m) then () else failwith ("expected " ^ s ^
+    "Rax " ^ (Int64.to_string m.regs.(rind Rax))
+  )
+
 let negq_ = test_machine
     [InsB0 (Addq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag
     ;InsB0 (Negq, [~%Rax]);InsFrag;InsFrag;InsFrag
@@ -88,15 +85,31 @@ let xorq_ = test_machine
 
 let sarq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Sarq, [~$4; ~%Rax]);InsFrag;InsFrag;InsFrag]
+    ;InsB0 (Sarq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)
+
+let sarq_zero_ = test_machine
+    [InsB0 (Movq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Sarq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 0*)
 
 let shlq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Shlq, [~$10; ~%Rax]);InsFrag;InsFrag;InsFrag]
+    ;InsB0 (Shlq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 6*)
+
+let shlq_overflow_ = test_machine
+    [InsB0 (Movq, [Imm (Lit 0x7FFFFFFFFFFFFFFFL); ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Shlq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*overflow*)
 
 let shrq_ = test_machine
     [InsB0 (Movq, [~$3; ~%Rax]);InsFrag;InsFrag;InsFrag
-    ;InsB0 (Shrq, [~$6; ~%Rax]);InsFrag;InsFrag;InsFrag]
+    ;InsB0 (Shrq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)
+      
+let shrq_zero_ = test_machine
+    [InsB0 (Movq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Shrq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)
+
+let shrq_overflow_ = test_machine
+    [InsB0 (Movq, [Imm (Lit 0xFFFFFFFFFFFFFFFFL); ~%Rax]);InsFrag;InsFrag;InsFrag
+    ;InsB0 (Shrq, [~$1; ~%Rax]);InsFrag;InsFrag;InsFrag] (*Rax is 1*)        
 
 (*************************************************************)
 (******************* SELF_WRITTEN TESTS **********************)
@@ -142,25 +155,129 @@ let instruction_tests = [
     (fun m -> m.regs.(rind Rbx) = 3L)
   );
 
-  ("sarq_", machine_test "test" 3 sarq_
-    (fun m -> m.regs.(rind Rax) = 0L
-           && m.flags = {fo = false; fs = false; fz = true})
+  ("sarq_", machine_test "sarq_" 3 sarq_
+    (fun m -> m.regs.(rind Rax) = 1L
+            && m.flags.fo = false
+            && m.flags.fs = false
+            && m.flags.fz = false)
   );
 
-  ("shlq_", machine_test "test" 2 shlq_
-    (fun m -> m.regs.(rind Rax) = Int64.of_int 3072
-           && m.flags = {fo = false; fs = false; fz = false})
+   ("sarq_zero_", machine_test "sarq_zero_" 3 sarq_zero_
+    (fun m -> m.regs.(rind Rax) = 0L
+            && m.flags.fo = false
+            && m.flags.fs = false
+            && m.flags.fz = true)
   );
 
-  ("shrq_", machine_test "test" 3 shrq_
+  ("shlq_", machine_test "shlq_" 2 shlq_
+    (fun m -> m.regs.(rind Rax) = 6L
+            && m.flags.fo = false
+            && m.flags.fs = false
+            && m.flags.fz = false));
+  
+
+  ("shlq_overflow_", machine_test "shlq_overflow_" 2 shlq_overflow_
+    (fun m -> m.flags.fo = true
+            && m.flags.fs = true
+            && m.flags.fz = false));
+
+  ("shrq_", machine_test "shrq_" 2 shrq_
+    (fun m -> m.regs.(rind Rax) = 1L
+            && m.flags.fo = false
+            && m.flags.fs = false
+            && m.flags.fz = false));
+  
+  ("shrq_zero_", machine_test "shrq_zero" 2 shrq_zero_
     (fun m -> m.regs.(rind Rax) = 0L
-           && m.flags = {fo = false; fs = false; fz = true})
-  );
+            && m.flags.fo = false
+            && m.flags.fs = false
+            && m.flags.fz = true));
+
+  ("shrq_overflow_", machine_test "shrq_overflow" 2 shrq_overflow_
+    (fun m -> m.flags.fo = true
+            && m.flags.fs = false
+            && m.flags.fz = false));
 ]
 
-let provided_tests : suite = [
-  Test ("Student-Provided Big Test for Part III: Score recorded as PartIIITestCase", [
-  ]);
+ (* copied from gradedtests.ml *)
+let program_test (p:prog) (ans:int64) () =
+  let res = assemble p |> load |> run in
+  if res <> ans
+  then failwith (Printf.sprintf("Expected %Ld but got %Ld") ans res)
+  else ()
 
-  Test("Self-Instruction-Tests", instruction_tests)
-] 
+(* Part 3 : Assembly Programming *)
+let lcm a b =
+    [text "mod"
+  	  [
+            Cmpq, [~%R12; ~%R11]
+  	  ; J Lt, [~$$"exit1"]
+  	  ; Subq, [~%R12; ~%R11]
+          ; Jmp,  [~$$"mod"]
+  	  ]
+    ; text "exit1"
+          [
+            Retq, []
+          ]
+    ; text "lcm"
+  	  [
+           Cmpq,  [~$0; ~%R09]
+         ; J Eq,  [~$$"exit2"]
+         ; Movq,  [~%R09; ~%R10]
+         ; Movq,  [~%R08; ~%R11]
+         ; Movq,  [~%R09; ~%R12]
+  	 ; Callq, [~$$"mod"]			      
+         ; Movq,  [~%R11; ~%R09]
+  	 ; Movq,  [~%R10; ~%R08]
+  	 ; Jmp,   [~$$"lcm"]
+         ]
+    ; text "div"
+         [
+           Cmpq,  [~$0; ~%R15]
+         ; J Eq,  [~$$"exit"]
+         ; Subq,  [~%R13; ~%R15]
+         ; Addq,  [~$1; ~%Rax]
+         ; Jmp,   [~$$"div"]
+         ]
+    ; text "exit2"
+         [
+           Movq,  [~%R08; ~%R13]
+         ; Imulq, [~%R14; ~%R15]         
+         ; Movq,  [~$0; ~%Rax]
+         ; Jmp,   [~$$"div"]    
+         ]
+    ; text "exit"
+         [
+           Retq,  []
+         ]
+    ; gtext "main"
+         [
+           Movq,  [~$a; ~%R14]
+         ; Movq,  [~$b; ~%R15]
+         ; Movq,  [~%R14; ~%R08]
+         ; Movq,  [~%R15; ~%R09]
+         ; Callq, [~$$"lcm"]
+         ; Retq,  []
+         ]
+    ]
+
+  let past3_test = [
+    ("lcm_8_12", program_test (lcm 8 12) 24L);
+    ("lcm_12_8", program_test (lcm 12 8) 24L);
+    ("lcm_prime", program_test (lcm 5 3) 15L);
+    ("lcm_large", program_test (lcm 80 90) 720L);
+  ]
+
+(* These tests are provided by you -- they will be graded manually *)
+
+(* You should also add additional test cases here to help you   *)
+(* debug your program.  
+                                        *)
+let provided_tests : suite =
+[
+  Test ("Student-Provided Big Test for Part III: Score recorded as PartIIIWrittenTestCase", instruction_tests);
+  Test ("Student-Provided Big Test for Part III: Score recorded as PartIIIAssemblyTestCase", past3_test);
+ ]
+
+
+
