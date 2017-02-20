@@ -7,7 +7,7 @@ open X86
 (* allocated llvmlite function bodies --------------------------------------- *)
 
 (* Generating X86 assembly is tricky, and it helps to split the problem into
-   two parts: 
+   two parts:
 
    1) Figuring out how to represent states of the LLVMlite machine as
       those of the X86lite machine, i.e. where should we store uid %x
@@ -43,25 +43,25 @@ type loc =
   | LStk of int                 (* a stack offset from %rbp *)
   | LLbl of X86.lbl             (* an assembler label *)
 
-type operand = 
+type operand =
   | Null
   | Const of int64
   | Gid of X86.lbl
   | Loc of loc
 
 type insn =
-  | ILbl
-  | Binop of bop * ty * operand * operand
-  | Alloca of ty
-  | Load of ty * operand
-  | Store of ty * operand * operand
-  | Icmp of Ll.cnd * ty * operand * operand
-  | Call of ty * operand * (ty * operand) list
-  | Bitcast of ty * operand * ty
-  | Gep of ty * operand * operand list
-  | Ret of ty * operand option
-  | Br of loc
-  | Cbr of operand * loc * loc
+  | ILbl (* Label *)
+  | Binop of bop * ty * operand * operand (* i64 x i64 → i64 *)
+  | Alloca of ty (*	- → S *)
+  | Load of ty * operand (* S* → S *)
+  | Store of ty * operand * operand (* S x S* → void *)
+  | Icmp of Ll.cnd * ty * operand * operand (* S x S → i1 *)
+  | Call of ty * operand * (ty * operand) list (* S1(S2, ..., SN)* x S2 x ... x SN → S1 *)
+  | Bitcast of ty * operand * ty (* T1* → T2* *)
+  | Gep of ty * operand * operand list (* T1* x i64 x ... x i64 -> GEPTY(T1, OP1, ..., OPN) *)
+  | Ret of ty * operand option (* terminator *)
+  | Br of loc (* terminator *)
+  | Cbr of operand * loc * loc (* terminator *)
 
 (* An allocated function body is just a flattened list of instructions,
    labels, and terminators. All uids, labels, and gids are replaced with the
@@ -78,7 +78,7 @@ let map_operand f g : Ll.operand -> operand = function
   | Gid x -> Gid (g x)
   | Id u -> Loc (f u)
 
-let map_insn f g : Ll.insn -> insn = 
+let map_insn f g : Ll.insn -> insn =
   let mo = map_operand f g in function
   | Binop (b,t,o,o') -> Binop (b,t,mo o,mo o')
   | Alloca t         -> Alloca t
@@ -89,7 +89,7 @@ let map_insn f g : Ll.insn -> insn =
   | Bitcast (t,o,t') -> Bitcast (t,mo o,t')
   | Gep (t,o,is)     -> Gep (t,mo o,List.map mo is)
 
-let map_terminator f g : Ll.terminator -> insn = 
+let map_terminator f g : Ll.terminator -> insn =
   let mo = map_operand f g in function
   | Ret (t,None)   -> Ret (t, None)
   | Ret (t,Some o) -> Ret (t, Some (mo o))
@@ -99,7 +99,7 @@ let map_terminator f g : Ll.terminator -> insn =
 let of_block f g (b:Ll.block) : fbody =
   List.map (fun (u,i) -> f u, map_insn f g i) b.insns
   @ [LVoid, map_terminator f g b.terminator]
-                                
+
 let of_lbl_block f g (l,b:Ll.lbl * Ll.block) : fbody =
   (LLbl (Platform.mangle l), ILbl)::of_block f g b
 
@@ -114,8 +114,8 @@ end
    identifiers to X86 abstractions.  For the best performance, one
    would want to use an X86 register for each LLVM %uid that is assigned
    a value.  However, since there are an unlimited number of %uids and
-   only 16 registers, doing so effectively is quite difficult. We will 
-   see later in the course how _register allocation_ algorithms can do a 
+   only 16 registers, doing so effectively is quite difficult. We will
+   see later in the course how _register allocation_ algorithms can do a
    good job at this.
 
    A simpler, but less performant, implementation is to map each %uid
@@ -130,27 +130,27 @@ end
    We call the datastructure that maps each %uid to its stack slot a
    'stack layout'. A stack layout maps a uid to an Alloc.loc that represents
    where it will be stored. Recall that some uids identify instructions that
-   do not assign a value, whereas others name code blocks. These are mapped to 
-   Alloc.LVoid, and Alloc.LLbl, respectively. For this compilation strategy, 
+   do not assign a value, whereas others name code blocks. These are mapped to
+   Alloc.LVoid, and Alloc.LLbl, respectively. For this compilation strategy,
    uids that are assigned values will always be assigned an offset from ebp
-   (in bytes) that corresponds to a storage slot in the stack.  
+   (in bytes) that corresponds to a storage slot in the stack.
 *)
-type layout = (uid * Alloc.loc) list 
+type layout = (uid * Alloc.loc) list
 
 
 (* Once we have a layout, it's simple to generate the allocated version of our
    LLVMlite program *)
 let alloc_cfg (layout:layout) (g:Ll.cfg) : Alloc.fbody =
-  Alloc.of_cfg (fun x -> List.assoc x layout) 
+  Alloc.of_cfg (fun x -> List.assoc x layout)
                (fun l -> Platform.mangle l) g
 
 (* streams of x86 instructions ---------------------------------------------- *)
 
-type x86elt = 
+type x86elt =
   | I of X86.ins
   | L of (X86.lbl * bool)
 
-type x86stream = x86elt list 
+type x86stream = x86elt list
 
 let lift : X86.ins list -> x86stream =
   List.rev_map (fun i -> I i)
@@ -173,11 +173,11 @@ let prog_of_x86stream : x86stream -> X86.prog =
    global addresses that must be computed from a label.  Constants are
    immediately available, and the operand Null is the 64-bit 0 value.
 
-   You might find it useful to implement the following helper function, 
-   whose job is to generate the X86 operand corresponding to an allocated 
+   You might find it useful to implement the following helper function,
+   whose job is to generate the X86 operand corresponding to an allocated
    LLVMlite operand.
  *)
-let compile_operand : Alloc.operand -> X86.operand = 
+let compile_operand : Alloc.operand -> X86.operand =
   function _ -> failwith "compile_operand unimplemented"
 
 
@@ -185,7 +185,7 @@ let compile_operand : Alloc.operand -> X86.operand =
 
 (* compiling call  ---------------------------------------------------------- *)
 
-(* You will probably find it helpful to implement a helper function that 
+(* You will probably find it helpful to implement a helper function that
    generates code for the LLVM IR call instruction.
 
    The code you generate should follow the x64 System V AMD64 ABI
@@ -205,7 +205,7 @@ let compile_operand : Alloc.operand -> X86.operand =
 
 
 
-let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream = 
+let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
 failwith "compile_call unimplemented"
 
 (* compiling getelementptr (gep)  ------------------------------------------- *)
@@ -219,7 +219,7 @@ failwith "compile_call unimplemented"
    the appropriate arithemetic calculations.
 *)
 
-(* [size_ty] maps an LLVMlite type to a size in bytes. 
+(* [size_ty] maps an LLVMlite type to a size in bytes.
     (needed for getelementptr)
 
    - the size of a struct is the sum of the sizes of each component
@@ -233,7 +233,7 @@ failwith "compile_call unimplemented"
 let rec size_ty tdecls t : int =
 failwith "size_ty not implemented"
 
-(* Generates code that computes a pointer value.  
+(* Generates code that computes a pointer value.
 
    1. o must be a pointer of type t=*t'
 
@@ -244,14 +244,14 @@ failwith "size_ty not implemented"
 
    4. subsequent indices are interpreted according to the type t':
 
-     - if t' is a struct, the index must be a constant n and it 
+     - if t' is a struct, the index must be a constant n and it
        picks out the n'th element of the struct. [ NOTE: the offset
-       within the struct of the n'th element is determined by the 
+       within the struct of the n'th element is determined by the
        sizes of the types of the previous elements ]
 
      - if t' is an array, the index can be any operand, and its
        value determines the offset within the array.
- 
+
      - if t' is any other type, the path is invalid
 
      - make sure you can handle named types!
@@ -261,7 +261,7 @@ failwith "size_ty not implemented"
       by the path so far
 *)
 
-let compile_getelementptr tdecls (t:Ll.ty) 
+let compile_getelementptr tdecls (t:Ll.ty)
                           (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
 failwith " unimplemented"
 
@@ -319,11 +319,11 @@ let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
-(* We suggest that you create a helper function that computes the 
+(* We suggest that you create a helper function that computes the
    layout for a given function declaration.
 
    - each function argument should be copied into a stack slot
-   - in this (inefficient) compilation strategy, each local id 
+   - in this (inefficient) compilation strategy, each local id
      is also stored as a stack slot.
    - uids associated with instructions that do not assign a value,
      such as Store and a Call of a Void function should be associated
@@ -377,7 +377,7 @@ let rec compile_ginit = function
   | GGid gid   -> [Quad (Lbl (Platform.mangle gid))]
   | GInt c     -> [Quad (Lit c)]
   | GString s  -> [Asciz s]
-  | GArray gs 
+  | GArray gs
   | GStruct gs -> List.map compile_gdecl gs |> List.flatten
 
 and compile_gdecl (_, g) = compile_ginit g
