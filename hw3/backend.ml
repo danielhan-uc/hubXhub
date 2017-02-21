@@ -178,10 +178,17 @@ let prog_of_x86stream : x86stream -> X86.prog =
    LLVMlite operand.
  *)
 let compile_operand : Alloc.operand -> X86.operand =
-  function _ -> failwith "compile_operand unimplemented"
-
-
-
+  function
+  | Null -> Imm Lit 0
+  | Const i64 -> Imm Lit i64
+  | Gid lbl -> Imm Lbl lbl
+  | Loc loc ->
+    begin match loc with
+    | LReg reg -> Reg reg
+    | LStk x -> Ind3 (Lit x, Rbp)
+    | LLbl lbl -> Imm Lbl lbl (*Block Labels*)
+    | LVoid -> Imm Lit 0
+    end
 
 (* compiling call  ---------------------------------------------------------- *)
 
@@ -312,27 +319,199 @@ failwith " unimplemented"
    - Br should jump
 
    - Cbr branch should treat its operand as a boolean conditional
+
+   (* X86 locations *)
+   type loc =
+     | LVoid                       (* no storage *)
+     | LReg of X86.reg             (* x86 register *)
+     | LStk of int                 (* a stack offset from %rbp *)
+     | LLbl of X86.lbl             (* an assembler label *)
+
+   type operand =
+     | Null
+     | Const of int64
+     | Gid of X86.lbl
+     | Loc of loc
+
+   type insn =
+     | ILbl (* Label *)
+     | Binop of bop * ty * operand * operand (* i64 x i64 → i64 *)
+     | Alloca of ty (*	- → S *)
+     | Load of ty * operand (* S* → S *)
+     | Store of ty * operand * operand (* S x S* → void *)
+     | Icmp of Ll.cnd * ty * operand * operand (* S x S → i1 *)
+     | Call of ty * operand * (ty * operand) list (* S1(S2, ..., SN)* x S2 x ... x SN → S1 *)
+     | Bitcast of ty * operand * ty (* T1* → T2* *)
+     | Gep of ty * operand * operand list (* T1* x i64 x ... x i64 -> GEPTY(T1, OP1, ..., OPN) *)
+     | Ret of ty * operand option (* terminator *)
+     | Br of loc (* terminator *)
+     | Cbr of operand * loc * loc (* terminator *)
+
+   type fbody = (loc * insn) list
 *)
 
+let translate_binop (binop: bop) : X86.opcode =
+  begin match binop with
+  | Add -> Addq  | Sub -> Subq   | Mul -> IMulq
+  | Shl -> Shlq  | Lshr -> Shrq  | Ashr -> Sarq
+  | And -> Andq  | Or -> Orq     | Xor -> Xorq
+  end
+
+let translate_icmp (icmp: cnd) : X86.opcode =
+  begin match icmp with
+  | Eq -> Addq   | Ne -> Subq   | Slt -> IMulq
+  | Sle -> Shlq  | Sgt -> Shrq  | Sge -> Sarq
+  end
+
 let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
-  failwith "compile_fbody unimplemented"
+  let cur_stream = [] in
+  let rec fbody_helper (cur_stream: x86stream) (af:Alloc.fbody) : x86stream =
+  begin match af with
+  | [] ->
+  | h :: tl ->
+    begin match snd h with
+    | Binop (b,t,o,o') ->
+        fbody_helper (cur_stream @ [I (translate_binop b, [compile_operand o, compile_operand o'])]) tl
+    (* | Alloca t         ->  *)
+    (* | Load (t,o)       ->  *)
+    (* | Store (t,o,o')   ->  *)
+    (* | Icmp (c,t,o,o')  -> *)
+        (* fbody_helper (cur_stream @ [I (Cmpq, [compile_operand o, compile_operand o'])]) tl
+    *)
+    | Call (t,o,args)  ->
+        fbody_helper (cur_stream @ [compile_call o args]) tl
+    (* | Bitcast (t,o,t') ->  *)
+    (* | Gep (t,o,is)     ->  *)
+    | Ret (t,o)        ->
+    (* Ret of ty * operand option  *)
+      begin match o with
+      | Some c -> c
+      | None -> 0
+
+
+    | Br (l)           ->
+    | Cbr (o,l,l')     ->
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
 (* We suggest that you create a helper function that computes the
    layout for a given function declaration.
 
-   - each function argument should be copied into a stack slot
-   - in this (inefficient) compilation strategy, each local id
-     is also stored as a stack slot.
-   - uids associated with instructions that do not assign a value,
-     such as Store and a Call of a Void function should be associated
-     with Alloc.LVoid
-   - LLVMlite uids and labels share a namespace. Block labels you encounter
-     should be associated with Alloc.Llbl
+
+     loc =
+       | LVoid                       (* no storage *)
+       | LReg of X86.reg             (* x86 register *)
+       | LStk of int                 (* a stack offset from %rbp *)
+       | LLbl of X86.lbl             (* an assembler label *)
+
+     fdecl = { fty: fty; param: uid list; cfg: cfg }
+     layout = (uid * Alloc.loc) list
+     type uid = string                       (* Local identifiers  *)
+
+     fty -> argument types and return type
+     param -> arguemnts
+     cfg -> control graph which is the program itself
+
+     define i64 @program(i64 %argc, i8** %arcv) {
+       // i64 -> return type
+       // %argc, %arcv -> LLbl of X86.lbl
+       %1 = mul i64 7, 7 -> LStk of int * insn
+       %2 = add i64 42, %argc -> LStk of int * insn
+       %3 = alloca i64 -> LStk of int * insn
+       store i64 %1, i64* %3 -> LVoid * insn
+       br label %l1 -> terminator
+     l1: -> LLbl of X86.lbl
+       %4 = icmp sle i64 64, %2 -> LStk of int * insn
+       %5 = load i64, i64* %3 -> LStk of int * insn
+       %6 = bitcast i64* %3 to i8* -> LStk of int * insn
+       %7 = getelementptr i8, i8* %6, i32 0 -> LStk of int * insn
+       %8 = sub i64 %5, 3 -> LStk of int * insn
+       store i64 %8, i64* %3 -> LVoid * insn
+       %9 = icmp sgt i64 %8, 0 -> LStk of int * insn
+       br i1 %9, label %l1, label %l2 -> terminator
+     l2: -> LLbl of X86.lbl
+       %10 = load i64, i64* %3 -> LStk of int * insn
+       ret i64 %10 -> terminator
+     }
+
+     (* LLVM IR types *)
+     type ty =
+       | Void                            (* mix of unit/bottom from C *)
+       | I1 | I8 | I64                   (* integer types             *)
+       | Ptr of ty                       (* t*                        *)
+       | Struct of ty list               (* { t1, t2, ... , tn }      *)
+       | Array of int * ty               (* [ NNN x t ]               *)
+       | Fun of fty                      (* t1, ..., tn -> tr         *)
+       | Namedt of tid                   (* named type aliases        *)
+
+     (* Function type: argument types and return type *)
+     and fty = ty list * ty
+
+     (* Control Flow Graph: a pair of an entry block and a set labeled blocks *)
+     type cfg = block * (lbl * block) list
+
+     (* Basic blocks *)
+     type block = { insns: (uid * insn) list; terminator: terminator }
+
+     (* Block terminators *)
+     type terminator =
+       | Ret of ty * operand option   (* ret i64 %s                     *)
+       | Br of lbl                    (* br label %lbl                  *)
+       | Cbr of operand * lbl * lbl   (* br i1 %s, label %l1, label %l2 *)
+
+
+          - each function argument should be copied into a stack slot
+          - in this (inefficient) compilation strategy, each local id
+            is also stored as a stack slot.
+          - uids associated with instructions that do not assign a value,
+            such as Store and a Call of a Void function should be associated
+            with Alloc.LVoid
+          - LLVMlite uids and labels share a namespace. Block labels you encounter
+            should be associated with Alloc.Llbl
+
+            layout = (uid * Alloc.loc) list
 *)
+
 let stack_layout (f:Ll.fdecl) : layout =
-failwith "stack_layout unimplemented"
+  let cur_layout = [] in
+  (* f.param -> rdi, rsi, rdx, rcx, r09, r10, rbp에서 offset*)
+  (* f.cfg -> rbp에서 offset
+              call, store -> empty '_'
+              block 돌고
+              (lbl * block) list 돌고
+  *)
+  let rec param_helper (cur_layout: (uid * Alloc.loc) list) (l: uid list) (inx: int): (uid * Alloc.loc) list * int=
+    begin match l with
+    | [] -> (cur_layout, inx - 6)
+    | h :: tl ->
+      begin match inx with
+      | 1 -> param_helper (cur_layout @ [(h, Alloc.LReg Rdi)]) tl 2
+      | 2 -> param_helper (cur_layout @ [(h, Alloc.LReg Rsi)]) tl 3
+      | 3 -> param_helper (cur_layout @ [(h, Alloc.LReg Rdx)]) tl 4
+      | 4 -> param_helper (cur_layout @ [(h, Alloc.LReg Rcx)]) tl 5
+      | 5 -> param_helper (cur_layout @ [(h, Alloc.LReg R09)]) tl 6
+      | 6 -> param_helper (cur_layout @ [(h, Alloc.LReg R08)]) tl 7
+      | x -> param_helper (cur_layout @ [(h, Alloc.LStk (x-6))]) tl (x+1)
+      end
+    end in
+  let rec block_helper (cur_layout: (uid * Alloc.loc) list) (l: (uid * insn) list) (inx: int): (uid * Alloc.loc) list * int=
+    begin match l with
+    | [] -> (cur_layout, inx)
+    | h :: tl ->
+      begin match (fst h) with
+      | "store" -> block_helper (cur_layout @ [("_", Alloc.LVoid) tl inx
+      | "call" -> block_helper (cur_layout @ [("_", Alloc.LVoid) tl inx
+      | u -> block_helper (cur_layout @ [(u, Alloc.LStk inx) tl (inx+1)
+    end in
+  let rec cfg_helper (cur_layout: (uid * Alloc.loc) list) (l: (lbl * block) list) (inx: int): (uid * Alloc.loc) list =
+    begin match l with
+    | [] -> cur_layout
+    | h :: tl ->
+      let block = block_helper [] ((snd h).insns) inx in
+      cfg_helper (cur_layout @ [(fst h, Alloc.LLbl (fst h))] @ (fst block)) tl (snd block)
+    end in
+  let temp = param_helper cur_layout f.param 1 in
+  cfg_helper (fst temp) (snd f.cfg) (snd temp)
 
 (* The code for the entry-point of a function must do several things:
 
@@ -360,12 +539,24 @@ failwith "stack_layout unimplemented"
 
    [ NOTE: the first six arguments are numbered 0 .. 5 ]
 *)
+
 let arg_loc (n : int) : X86.operand =
-  failwith "arg_loc unimplemented"
+  begin match n with
+  | 0 -> Ind2 Rdi
+  | 1 -> Ind2 Rsi
+  | 2 -> Ind2 Rdx
+  | 3 -> Ind2 Rcx
+  | 4 -> Ind2 R09
+  | 5 -> Ind2 R08
+  | x -> Ind3 (x - 5, Rbp)
+  end
 
 
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
-failwith "compile_fdecl unimplemented"
+  let body = alloc_cfg (stack_layout f) f.cfg in
+  compile_fbody tdecls body
+
+
 
 (* compile_gdecl ------------------------------------------------------------ *)
 
