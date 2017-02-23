@@ -1,0 +1,7 @@
+S src/
+S src/x86
+S src/ll
+
+B _build/
+B _build/x86
+B _build/ll
