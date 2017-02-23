@@ -237,12 +237,12 @@ let compile_operand : Alloc.operand -> X86.operand =
   function
   | Alloc.Null -> Imm (Lit 0L)
   | Alloc.Const i64 -> Imm (Lit i64)
-  | Alloc.Gid lbl -> Ind1 (Lbl lbl)
+  | Alloc.Gid lbl -> Imm (Lbl lbl)
   | Alloc.Loc loc ->
     begin match loc with
     | Alloc.LReg reg -> Reg reg
     | Alloc.LStk x -> Ind3 (Lit (Int64.of_int x), Rbp)
-    | Alloc.LLbl lbl -> Ind1 (Lbl lbl) (*Block Labels*)
+    | Alloc.LLbl lbl -> Imm (Lbl lbl) (*Block Labels*)
     | Alloc.LVoid -> Imm (Lit 0L)
     end
 
@@ -266,10 +266,40 @@ let compile_operand : Alloc.operand -> X86.operand =
    needed). ]
 *)
 
+let arg_helper (n : int) : X86.operand =
+  begin match n with
+  | 0 -> Reg Rdi
+  | 1 -> Reg Rsi
+  | 2 -> Reg Rdx
+  | 3 -> Reg Rcx
+  | 4 -> Reg R09
+  | 5 -> Reg R08
+  | x -> Ind3 (Lit (Int64.of_int (8 * (x-5))), Rbp)
+  end
+
 
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
-failwith "compile_call unimplemented"
+  Printf.printf "elements : %d\n" (List.length os);
+  let call_stream = [] in
+  let clean_up = [I (Callq, [compile_operand fo]); I (Addq, [Imm (Lit (Int64.of_int (8 * (List.length os)))); Reg Rsp])] in
+  let rec call_helper (stream: x86stream) (o:(ty * Alloc.operand) list) (i: int) : x86stream =
+    begin match o with
+    | [] -> []
+    | h::tl ->
+       if i < 6 then call_helper (stream @ [I (Pushq, [arg_helper i]); I (Movq, [compile_operand (snd h); arg_helper i])]) tl (i - 1)
+       else  call_helper (stream @ [I (Movq, [compile_operand (snd h); arg_helper i])]) tl (i - 1)
+    end in
+  let rec clean_helper (stream: x86stream) (o:(ty * Alloc.operand) list) (i: int) : x86stream =
+    if i < List.length o then clean_helper (stream @ [I (Popq, [arg_helper i])]) o (i+1)
+    else stream
+    in
+    let temp = call_helper call_stream (List.rev os) (List.length os) in
+    clean_helper (temp @ clean_up) os 0
+
+
+
+
 
 (* compiling getelementptr (gep)  ------------------------------------------- *)
 
@@ -413,6 +443,12 @@ let translate_binop (binop: bop) : X86.opcode =
   | And -> Andq  | Or -> Orq     | Xor -> Xorq
   end
 
+let translate_cnd (c: Ll.cnd) : X86.cnd =
+  begin match c with
+  | Eq -> Eq   | Ne -> Neq  | Slt -> Lt
+  | Sle -> Le  | Sgt -> Gt  | Sge -> Ge
+  end
+
 (*let translate_icmp (icmp: cnd) : X86.opcode =
   begin match icmp with
   | Eq -> Addq   | Ne -> Subq   | Slt -> Imulq
@@ -429,15 +465,15 @@ let insn_helper tdecls (l: Alloc.loc) (ins: Alloc.insn) : x86stream =
      end
   | (LVoid, Br lbl) -> [I (Jmp, [compile_operand (Loc lbl)])]
   | (LVoid, Cbr (o,l,l')) -> [I (Cmpq, [Imm (Lit 0L); compile_operand o]); I (J Eq, [compile_operand (Loc l)]); I (Jmp, [compile_operand (Loc l')])]
-  | (LVoid, Store (t,o,o')) -> []
-  | (LVoid, Call (t,o,args)) -> []
+  | (LVoid, Store (t,o,o')) -> [I (Movq, [compile_operand o; compile_operand o'])]
+  | (LVoid, Call (t,o,args)) -> compile_call o args
   | (LLbl l, _) -> [L (l, false)]
   | (LStk i, Binop (b,t,o,o')) -> [I (Movq, [compile_operand o; Reg R10]); I (translate_binop b, [compile_operand o'; Reg R10]); I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
-  | (LStk i, Alloca t) -> []
-  | (LStk i, Load (t,o)) -> []
-  | (LStk i, Icmp (c,t,o,o')) -> []
+  | (LStk i, Alloca t) -> [I (Movq, [Imm (Lit 8L); Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Load (t,o)) -> [I (Movq, [compile_operand o; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Icmp (c,t,o,o')) -> [I (Movq, [compile_operand o'; Reg R10]); I (Cmpq, [compile_operand o; Reg R10]); I (Set (translate_cnd c), [Ind3 (Lit (Int64.of_int i), Rbp)]); I (Andq, [Imm (Lit 1L); Ind3 (Lit (Int64.of_int i), Rbp)])]
   | (LStk i, Bitcast (t,o,t')) -> []
-  | (LStk i, Call (t,o,args)) -> []
+  | (LStk i, Call (t,o,args)) -> (compile_call o args) @ [I (Movq, [Reg Rax; Ind3 (Lit (Int64.of_int i), Rbp)])]
   | (LStk i, Gep (t,o,is)) -> []
   | (_, _) -> []
   end
@@ -571,7 +607,7 @@ let stack_layout (f:Ll.fdecl) : layout =
     | [] -> cur_layout
     | h :: tl ->
        let block = block_helper [] ((snd h).insns) inx in
-       cfg_helper (cur_layout @ [(fst h, Alloc.LLbl (fst h))] @ (fst block)) tl (snd block)
+       cfg_helper (cur_layout @ [(fst h, Alloc.LLbl (Platform.mangle (fst h)))] @ (fst block)) tl (snd block)
     end in
   let temp = param_helper cur_layout f.param 1 in
   let rec print_layout (l: (uid * Alloc.loc) list) =
