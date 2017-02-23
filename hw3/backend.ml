@@ -269,7 +269,23 @@ let compile_operand : Alloc.operand -> X86.operand =
 
 
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
-failwith "compile_call unimplemented"
+  let call_stream = [] in
+  let clean_up = [I (Callq, [compile_operator fo]); I (Addq, [Imm (Lit (Int64.of_int (8 * (List.length os)))); Reg Rsp])] in
+  let rec call_helper (stream: x86stream) (i: int) : x86stream =
+    begin match List.rev os with
+    | [] -> []
+    | h::tl ->
+       if i < 6 then call_helper (stream @ [I (Pushq, [arg_loc i]); I (Movq, [compile_operator (snd h); arg_loc i])]) (i - 1)
+       else  call_helper (stream @ [I (Movq, [compile_operator (snd h); arg_loc i])]) (i - 1)
+    end in
+  let rec clean_helper (stream: x86stream) (i: int) : x86stream =
+    if i < List.length os then clean_helper (stream @ [I (Popq, [arg_loc i])])
+    else stream
+    in
+    
+    
+      
+              
 
 (* compiling getelementptr (gep)  ------------------------------------------- *)
 
