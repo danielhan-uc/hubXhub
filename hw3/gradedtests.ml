@@ -11,7 +11,7 @@ open Backend
 let size_ty_tests =
   [ ("ty_size1", assert_eqf (fun () -> size_ty [] I1) 8)
   ; ("ty_size3", assert_eqf (fun () -> size_ty [] I64) 8)
-  ; ("ty_size4", assert_eqf (fun () -> size_ty [] (Ptr Void)) 8)        
+  ; ("ty_size4", assert_eqf (fun () -> size_ty [] (Ptr Void)) 8)
   ; ("ty_size2", assert_eqf (fun () -> size_ty [] (Ptr I1)) 8)
   ; ("ty_size5", assert_eqf (fun () -> size_ty [] (Array (3, I64))) 24)
   ; ("ty_size6", assert_eqf
@@ -22,7 +22,7 @@ let size_ty_tests =
 
 let arg_loc_tests =
   []
-     
+
 let exec_e2e_ast ll_ast args extra_files =
   let output_path = !Platform.output_path in
   let dot_s_file = Platform.gen_name output_path "test" ".s" in
@@ -35,7 +35,7 @@ let exec_e2e_ast ll_ast args extra_files =
   let _ = Platform.sh (Printf.sprintf "rm -f %s %s" dot_s_file exec_file) Platform.ignore_error in
   let _ = Platform.verb @@ Printf.sprintf "** Executable exited with: %d\n" result in
   Int64.of_int result
-  
+
 
 let exec_e2e_file path args =
   let ast = Driver.parse_file path in
@@ -46,7 +46,7 @@ let io_test path args =
   let output_path = !Platform.output_path in
   let dot_s_file = Platform.gen_name output_path "test" ".s" in
   let exec_file = Platform.gen_name output_path "exec" "" in
-  let tmp_file = Platform.gen_name output_path "tmp" ".txt" in  
+  let tmp_file = Platform.gen_name output_path "tmp" ".txt" in
   let asm_ast = Backend.compile_prog ll_ast in
   let asm_str = X86.string_of_prog asm_ast in
   let _ = Driver.write_file dot_s_file asm_str in
@@ -99,27 +99,27 @@ let binop_tests =
 
 let calling_convention_tests =
   [ "llprograms/call.ll", 42L
-  ; "llprograms/call1.ll", 17L 
+  ; "llprograms/call1.ll", 17L
   ; "llprograms/call2.ll", 19L
   ; "llprograms/call3.ll", 34L
   ; "llprograms/call4.ll", 34L
   ; "llprograms/call5.ll", 24L
-  ; "llprograms/call6.ll", 26L            
+  ; "llprograms/call6.ll", 26L
   ]
 
 let memory_tests =
   [ "llprograms/alloca1.ll", 17L
   ; "llprograms/alloca2.ll", 17L
-  ; "llprograms/global1.ll", 12L    
+  ; "llprograms/global1.ll", 12L
   ]
 
 let terminator_tests =
   [ "llprograms/return.ll", 0L
   ; "llprograms/return42.ll", 42L
   ; "llprograms/br1.ll", 9L
-  ; "llprograms/br2.ll", 17L    
+  ; "llprograms/br2.ll", 17L
   ; "llprograms/cbr1.ll", 7L
-  ; "llprograms/cbr2.ll", 9L    
+  ; "llprograms/cbr2.ll", 9L
   ]
 
 let bitcast_tests =
@@ -133,17 +133,17 @@ let gep_tests =
   ; "llprograms/gep4.ll", 2L
   ; "llprograms/gep5.ll", 4L
   ; "llprograms/gep6.ll", 7L
-  ; "llprograms/gep7.ll", 7L    
-  ; "llprograms/gep8.ll", 2L    
+  ; "llprograms/gep7.ll", 7L
+  ; "llprograms/gep8.ll", 2L
   ]
 
 let io_tests =
   [ "llprograms/helloworld.ll", [], "hello, world!"
   ; "llprograms/string1.ll", [], "hello, world!hello, world!"
   ; "llprograms/callback1.ll", [], "38"
-  ; "llprograms/args1.ll", ["hello"], "argc < 3"    
+  ; "llprograms/args1.ll", ["hello"], "argc < 3"
   ; "llprograms/args1.ll", ["hello"; "cis341"], "hellocis341"
-  ; "llprograms/args1.ll", ["hello"; "cis341"; "foo"], "argc > 3"    
+  ; "llprograms/args1.ll", ["hello"; "cis341"; "foo"], "argc > 3"
   ]
 
 
@@ -164,12 +164,12 @@ let large_tests = [ "llprograms/list1.ll", 3L
                   ; "llprograms/factrect.ll", 120L
                   ]
 
-let tests : suite = [GradedTest("executed binop tests", 5, executed binop_tests)]
- (* [ GradedTest("size_ty tests", 5, size_ty_tests)
+let tests : suite =
+  [ GradedTest("size_ty tests", 5, size_ty_tests)
   ; GradedTest("arg_loc tests", 5, arg_loc_tests)
   ; GradedTest("executed binop tests", 5, executed binop_tests)
   ; GradedTest("terminator tests", 10, executed terminator_tests)
-  ; GradedTest("memory tests", 10, executed memory_tests)      
+  ; GradedTest("memory tests", 10, executed memory_tests)
   ; GradedTest("calling convention tests", 10, executed calling_convention_tests)
   ; GradedTest("bitcast tests", 2, executed bitcast_tests)
   ; GradedTest("gep tests", 10, executed gep_tests)
@@ -177,7 +177,7 @@ let tests : suite = [GradedTest("executed binop tests", 5, executed binop_tests)
   ; GradedTest("hidden tests", 5, hidden_tests)
   ; GradedTest("hidden large tests", 13, hidden_large_tests)
   ; GradedTest("io tests", 10, executed_io io_tests)
-  ]*)
+  ]
 
 let manual_tests : suite = [
   GradedTest ("Posted Piazza Test Case", 5,

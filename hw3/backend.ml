@@ -167,8 +167,8 @@ let prog_of_x86stream : x86stream -> X86.prog =
 
 
 (* Printing commands -------------------------------------------------------- *)
-          
-    
+
+
 let string_of_loc (l: Alloc.loc) : string =
   let open Alloc in
   match l with
@@ -185,33 +185,33 @@ let string_of_operand : Alloc.operand -> string =
   | Loc l    -> string_of_loc l
 
 let soo = string_of_operand
-            
+
 let soop (t,v:ty * Alloc.operand) : string =
   pp "%s %s" (sot t) (soo v)
 
-     
+
 let string_of_cnd : Ll.cnd -> string = function
-    | Eq  -> "eq"  | Ne  -> "ne"  | Slt -> "slt" 
+    | Eq  -> "eq"  | Ne  -> "ne"  | Slt -> "slt"
     | Sle -> "sle" | Sgt -> "sgt" | Sge -> "sge"
 
 let string_of_gep_index : Alloc.operand -> string = function
   | Alloc.Const i -> "i32 " ^ Int64.to_string i
   | o       -> "i64 " ^ soo o
-            
+
 let string_of_insn : Alloc.insn -> string =
   let open Alloc in function
   | Binop (b, t, o1, o2) -> pp "%s %s %s, %s"
                                (string_of_bop b) (sot t) (soo o1) (soo o2)
   | Alloca t             -> pp "alloca %s" (sot t)
   | Load (t, o)          -> pp "load %s, %s %s" (sot (dptr t)) (sot t) (soo o)
-  | Store (t, os, od)    -> pp "store %s %s, %s %s" 
+  | Store (t, os, od)    -> pp "store %s %s, %s %s"
                                (sot t) (soo os) (sot (Ptr t)) (soo od)
-  | Icmp (c, t, o1, o2)  -> pp "icmp %s %s %s, %s" 
+  | Icmp (c, t, o1, o2)  -> pp "icmp %s %s %s, %s"
                                (string_of_cnd c) (sot t) (soo o1) (soo o2)
   | Call (t, o, oa)      -> pp "call %s %s(%s)"
                                (sot t) (soo o) (mapcat ", " soop oa)
   | Bitcast (t1, o, t2)  -> pp "bitcast %s %s to %s" (sot t1) (soo o) (sot t2)
-  | Gep (t, o, oi)       -> pp "getelementptr %s, %s %s, %s" (sot (dptr t)) (sot t) (soo o) 
+  | Gep (t, o, oi)       -> pp "getelementptr %s, %s %s, %s" (sot (dptr t)) (sot t) (soo o)
                                (mapcat ", " string_of_gep_index oi)
   | _ -> ""
 
@@ -448,7 +448,7 @@ let insn_helper tdecls (l: Alloc.loc) (ins: Alloc.insn) : x86stream =
   | (LVoid, Store (t,o,o')) -> []
   | (LVoid, Call (t,o,args)) -> []
   | (LLbl l, _) -> [L (l, false)]
-  | (LStk i, Binop (b,t,o,o')) -> [I (Movq, [compile_operand o; Ind3 (Lit (Int64.of_int i), Rbp)]); I (translate_binop b, [compile_operand o'; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Binop (b,t,o,o')) -> [I (Movq, [compile_operand o; Reg R10]); I (translate_binop b, [compile_operand o'; Reg R10]); I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
   | (LStk i, Alloca t) -> []
   | (LStk i, Load (t,o)) -> []
   | (LStk i, Icmp (c,t,o,o')) -> []
@@ -457,9 +457,9 @@ let insn_helper tdecls (l: Alloc.loc) (ins: Alloc.insn) : x86stream =
   | (LStk i, Gep (t,o,is)) -> []
   | (_, _) -> []
   end
-    
 
-let compile_fbody tdecls (af:Alloc.fbody) : x86stream = 
+
+let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
   let stream = [] in
   let rec fbody_helper tdecls (cur_stream: x86stream) (afk:Alloc.fbody) : x86stream =
   begin match afk with
@@ -467,8 +467,8 @@ let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
   | h :: tl -> fbody_helper tdecls (cur_stream @ (insn_helper tdecls (fst h) (snd h))) tl
   end in
   fbody_helper tdecls stream af
-  
- 
+
+
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
@@ -599,7 +599,7 @@ let stack_layout (f:Ll.fdecl) : layout =
   let temp2 = fst (block_helper temp ((fst f.cfg).insns) 1) in
   print_layout temp2;
   (cfg_helper temp2 (snd f.cfg) 1) @ [("_", Alloc.LVoid)]
-  
+
 
 (* The code for the entry-point of a function must do several things:
 
