@@ -1,7 +1,9 @@
 S src/
 S src/x86
 S src/ll
+S src/util
 
 B _build/
 B _build/x86
 B _build/ll
+B _build/util

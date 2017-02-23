@@ -147,6 +147,16 @@ let string_of_named_insn (u,i:uid * insn) : string =
   | Store _ | Call (Void, _, _) -> string_of_insn i
   | _ -> pp "%%%s = %s" u (string_of_insn i)
 
+let string_of_reg (x: X86.reg) : string =
+  let open X86 in
+  begin match x with
+  | Rip -> "%rip"
+  | Rax -> "%rax" | Rbx -> "%rbx" | Rcx -> "%rcx" | Rdx -> "%rdx"
+  | Rsi -> "%rsi" | Rdi -> "%rdi" | Rbp -> "%rbp" | Rsp -> "%rsp"
+  | R08 -> "%r8"  | R09 -> "%r9"  | R10 -> "%r10" | R11 -> "%r11"
+  | R12 -> "%r12" | R13 -> "%r13" | R14 -> "%r14" | R15 -> "%r15"
+  end
+
 let string_of_terminator : terminator -> string = function
   | Ret (_, None)   -> "ret void"
   | Ret (t, Some o) -> pp "ret %s %s" (sot t) (soo o)

@@ -161,9 +161,65 @@ let ( >:: ) x y = y :: x
 let prog_of_x86stream : x86stream -> X86.prog =
   let rec loop p iis = function
     | [] -> (match iis with [] -> p | _ -> failwith "stream has no initial label")
-    | (I i)::s' -> loop p (i::iis) s'
-    | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
+    | (I i)::s' -> Printf.printf "II\n"; loop p (i::iis) s'
+    | (L (l,global))::s' -> Printf.printf "Global!\n"; loop ({ lbl=l; global; asm=Text iis }::p) [] s'
   in loop [] []
+
+
+(* Printing commands -------------------------------------------------------- *)
+          
+    
+let string_of_loc (l: Alloc.loc) : string =
+  let open Alloc in
+  match l with
+  | LVoid -> "none"
+  | LReg reg -> pp "reg: %s" (string_of_reg reg)
+  | LStk i -> pp "stk: %i" i
+  | LLbl lbl -> lbl
+
+let string_of_operand : Alloc.operand -> string =
+  let open Alloc in function
+  | Null    -> "null"
+  | Const i -> Int64.to_string i
+  | Gid g   -> "@" ^ g
+  | Loc l    -> string_of_loc l
+
+let soo = string_of_operand
+            
+let soop (t,v:ty * Alloc.operand) : string =
+  pp "%s %s" (sot t) (soo v)
+
+     
+let string_of_cnd : Ll.cnd -> string = function
+    | Eq  -> "eq"  | Ne  -> "ne"  | Slt -> "slt" 
+    | Sle -> "sle" | Sgt -> "sgt" | Sge -> "sge"
+
+let string_of_gep_index : Alloc.operand -> string = function
+  | Alloc.Const i -> "i32 " ^ Int64.to_string i
+  | o       -> "i64 " ^ soo o
+            
+let string_of_insn : Alloc.insn -> string =
+  let open Alloc in function
+  | Binop (b, t, o1, o2) -> pp "%s %s %s, %s"
+                               (string_of_bop b) (sot t) (soo o1) (soo o2)
+  | Alloca t             -> pp "alloca %s" (sot t)
+  | Load (t, o)          -> pp "load %s, %s %s" (sot (dptr t)) (sot t) (soo o)
+  | Store (t, os, od)    -> pp "store %s %s, %s %s" 
+                               (sot t) (soo os) (sot (Ptr t)) (soo od)
+  | Icmp (c, t, o1, o2)  -> pp "icmp %s %s %s, %s" 
+                               (string_of_cnd c) (sot t) (soo o1) (soo o2)
+  | Call (t, o, oa)      -> pp "call %s %s(%s)"
+                               (sot t) (soo o) (mapcat ", " soop oa)
+  | Bitcast (t1, o, t2)  -> pp "bitcast %s %s to %s" (sot t1) (soo o) (sot t2)
+  | Gep (t, o, oi)       -> pp "getelementptr %s, %s %s, %s" (sot (dptr t)) (sot t) (soo o) 
+                               (mapcat ", " string_of_gep_index oi)
+  | _ -> ""
+
+
+let string_of_fbody (l,i:Alloc.loc * Alloc.insn) : string =
+  match i with
+  | Alloc.Store _ | Alloc.Call (Void, _, _) -> string_of_insn i
+  | _ -> pp "%%%s = %s"  (string_of_loc l) (string_of_insn i)
 
 (* compiling operands  ------------------------------------------------------ *)
 
@@ -363,42 +419,40 @@ let translate_binop (binop: bop) : X86.opcode =
   | Sle -> Shlq  | Sgt -> Shrq  | Sge -> Sarq
   end*)
 
-let compile_fbody tdecls (af:Alloc.fbody) : x86stream = failwith "unimplemented"
- (* let cur_stream = [] in
-  let rec fbody_helper (cur_stream: x86stream) (af:Alloc.fbody) : x86stream =
-  begin match af with
-  | [] -> cur_stream
-  | (l, i) :: tl ->
-     begin match l with
-     (* | LVoid ->*)
-     | LStk k ->
-        begin match i with
-        | Binop (b,t,o,o') -> fbody_helper (cur_stream @ [I (translate_binop b, [compile_operand o, compile_operand o']); I (Movq, [Ind3 (Lit k, Rbp), compile_operand o])]) tl 
-        end
-    (* | Alloca t         ->  *)
-    (* | Load (t,o)       ->  *)
-    (* | Store (t,o,o')   ->  *)
-    (* | Icmp (c,t,o,o')  -> *)
-        (* fbody_helper (cur_stream @ [I (Cmpq, [compile_operand o, compile_operand o'])]) tl
-    *)
-    | Call (t,o,args)  ->
-        fbody_helper (cur_stream @ [compile_call o args]) tl
-    (* | Bitcast (t,o,t') ->  *)
-    (* | Gep (t,o,is)     ->  *)
-    | Ret (t,o)        ->
-    (* Ret of ty * operand option  *)
-      begin match o with
-      | Some c -> c
-      | None -> 0
-      end
-(*
-
-
-    | Br (l)           ->
-    | Cbr (o,l,l')     ->*)
+let insn_helper tdecls (l: Alloc.loc) (ins: Alloc.insn) : x86stream =
+  let open Alloc in
+  begin match (l, ins) with
+  | (LVoid, Ret (t, o)) ->
+     begin match o with
+     | Some c -> [I (Movq, [Reg Rbp; Reg Rsp]); I (Movq, [compile_operand c; Reg Rax]); I (Popq, [Reg Rbp]); I (Retq, [])]
+     | None -> [I (Movq, [Reg Rbp; Reg Rsp]); I (Popq, [Reg Rbp]); I (Retq, [])]
+     end
+  | (LVoid, Br lbl) -> [I (Jmp, [compile_operand (Loc lbl)])]
+  | (LVoid, Cbr (o,l,l')) -> [I (Cmpq, [Imm (Lit 0L); compile_operand o]); I (J Eq, [compile_operand (Loc l)]); I (Jmp, [compile_operand (Loc l')])]
+  | (LVoid, Store (t,o,o')) -> []
+  | (LVoid, Call (t,o,args)) -> []
+  | (LLbl l, _) -> [L (l, false)]
+  | (LStk i, Binop (b,t,o,o')) -> [I (Movq, [compile_operand o; Ind3 (Lit (Int64.of_int i), Rbp)]); I (translate_binop b, [compile_operand o'; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Alloca t) -> []
+  | (LStk i, Load (t,o)) -> []
+  | (LStk i, Icmp (c,t,o,o')) -> []
+  | (LStk i, Bitcast (t,o,t')) -> []
+  | (LStk i, Call (t,o,args)) -> []
+  | (LStk i, Gep (t,o,is)) -> []
+  | (_, _) -> []
   end
-  end*)
+    
 
+let compile_fbody tdecls (af:Alloc.fbody) : x86stream = 
+  let stream = [] in
+  let rec fbody_helper tdecls (cur_stream: x86stream) (afk:Alloc.fbody) : x86stream =
+  begin match afk with
+  | [] -> cur_stream
+  | h :: tl -> fbody_helper tdecls (cur_stream @ (insn_helper tdecls (fst h) (snd h))) tl
+  end in
+  fbody_helper tdecls stream af
+  
+ 
 
 (* compile_fdecl ------------------------------------------------------------ *)
 
@@ -516,11 +570,20 @@ let stack_layout (f:Ll.fdecl) : layout =
     begin match l with
     | [] -> cur_layout
     | h :: tl ->
-      let block = block_helper [] ((snd h).insns) inx in
-      cfg_helper (cur_layout @ [(fst h, Alloc.LLbl (fst h))] @ (fst block)) tl (snd block)
+       let block = block_helper [] ((snd h).insns) inx in
+       cfg_helper (cur_layout @ [(fst h, Alloc.LLbl (fst h))] @ (fst block)) tl (snd block)
     end in
   let temp = param_helper cur_layout f.param 1 in
-  cfg_helper temp (snd f.cfg) 1
+  let rec print_layout (l: (uid * Alloc.loc) list) =
+    begin match l with
+    | [] -> Printf.printf "done\n"
+    | h::tl -> Printf.printf "(%s, %s)\n" (fst h) (string_of_loc (snd h));
+               print_layout tl
+    end in
+  let temp2 = fst (block_helper temp ((fst f.cfg).insns) 1) in
+  print_layout temp2;
+  (cfg_helper temp2 (snd f.cfg) 1) @ [("_", Alloc.LVoid)]
+  
 
 (* The code for the entry-point of a function must do several things:
 
@@ -561,10 +624,22 @@ let arg_loc (n : int) : X86.operand =
   end
 
 
+
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
-  let stream = [I (Pushq, [Reg Rbp]); I (Movq, [Reg Rbp; Reg Rsp])] in
+  Printf.printf "Loop\n";
+  let stream = [L (Platform.mangle g, true); I (Pushq, [Reg Rbp]); I (Movq, [Reg Rsp; Reg Rbp])] in
   let body = alloc_cfg (stack_layout f) f.cfg in
-  stream @ (compile_fbody tdecls body)
+  let rec print_body (body: Alloc.fbody) =
+    begin match body with
+    | [] -> ()
+    | (l, i)::tl -> Printf.printf "%s\n" (string_of_fbody (l, i) );
+               print_body tl
+    end in
+  print_body body;
+  Printf.printf "%s\n" (X86.string_of_prog (prog_of_x86stream (List.rev (stream @ (compile_fbody tdecls body)))));
+  List.rev (stream @ (compile_fbody tdecls body))
+
+
 
 
 (* compile_gdecl ------------------------------------------------------------ *)
