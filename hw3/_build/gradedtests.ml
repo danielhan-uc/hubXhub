@@ -34,6 +34,7 @@ let exec_e2e_ast ll_ast args extra_files =
   let result = Driver.run_executable args exec_file in
   let _ = Platform.sh (Printf.sprintf "rm -f %s %s" dot_s_file exec_file) Platform.ignore_error in
   let _ = Platform.verb @@ Printf.sprintf "** Executable exited with: %d\n" result in
+  Printf.printf "our result: %i" (result);
   Int64.of_int result
 
 
@@ -131,7 +132,7 @@ let gep_tests =
   ; "llprograms/gep2.ll", 4L
   ; "llprograms/gep3.ll", 1L
   ; "llprograms/gep4.ll", 2L
-  ; "llprograms/gep5.ll", 4L
+  ; "llprograms/gep5.ll",  4L
   ; "llprograms/gep6.ll", 7L
   ; "llprograms/gep7.ll", 7L
   ; "llprograms/gep8.ll", 2L
@@ -145,6 +146,14 @@ let io_tests =
   ; "llprograms/args1.ll", ["hello"; "cis341"], "hellocis341"
   ; "llprograms/args1.ll", ["hello"; "cis341"; "foo"], "argc > 3"
   ]
+(* 
+let other_tests =
+  [ "llprograms/binary_gcd.ll", [], 0L
+  ; "llprograms/sieve.ll", [], 0L
+  ; "llprograms/lfsr.ll", [], 0L
+  ; "llprograms/matmul.ll", [], 0L
+  ; "llprograms/maxdiff.ll", 0L
+  ] *)
 
 
 
@@ -158,26 +167,28 @@ let hidden_tests =
 let hidden_large_tests =
   []
 
-let large_tests = [ "llprograms/list1.ll", 3L
+let large_tests = [
+                  "llprograms/list1.ll", 3L
                   ; "llprograms/cbr.ll", 42L
                   ; "llprograms/factorial.ll", 120L
                   ; "llprograms/factrect.ll", 120L
+                  ; "llprograms/maxdiff.ll", 11L
                   ]
 
 let tests : suite =
   [
-  (* GradedTest("size_ty tests", 5, size_ty_tests) ; *)
+  GradedTest("size_ty tests", 5, size_ty_tests) ;
   GradedTest("arg_loc tests", 5, arg_loc_tests) ;
   GradedTest("executed binop tests", 5, executed binop_tests) ;
   GradedTest("terminator tests", 10, executed terminator_tests) ;
   GradedTest("memory tests", 10, executed memory_tests) ;
   GradedTest("calling convention tests", 10, executed calling_convention_tests) ;
-  (* GradedTest("bitcast tests", 2, executed bitcast_tests) ; *)
-  (* GradedTest("gep tests", 10, executed gep_tests) ; *)
-  (* GradedTest("large tests", 5, executed large_tests) ; *)
-  (* GradedTest("hidden tests", 5, hidden_tests) ; *)
-  (* GradedTest("hidden large tests", 13, hidden_large_tests) ; *)
-  (* GradedTest("io tests", 10, executed_io io_tests) *)
+  GradedTest("bitcast tests", 2, executed bitcast_tests) ;
+  GradedTest("gep tests", 10, executed gep_tests) ;
+  GradedTest("large tests", 5, executed large_tests);
+  GradedTest("hidden tests", 5, hidden_tests) ;
+  GradedTest("hidden large tests", 13, hidden_large_tests) ;
+  GradedTest("io tests", 10, executed_io io_tests)
   ]
 
 let manual_tests : suite = [

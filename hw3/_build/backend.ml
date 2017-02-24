@@ -161,8 +161,8 @@ let ( >:: ) x y = y :: x
 let prog_of_x86stream : x86stream -> X86.prog =
   let rec loop p iis = function
     | [] -> (match iis with [] -> p | _ -> failwith "stream has no initial label")
-    | (I i)::s' -> Printf.printf "II\n"; loop p (i::iis) s'
-    | (L (l,global))::s' -> Printf.printf "Global!\n"; loop ({ lbl=l; global; asm=Text iis }::p) [] s'
+    | (I i)::s' -> loop p (i::iis) s'
+    | (L (l,global))::s' -> loop ({ lbl=l; global; asm=Text iis }::p) [] s'
   in loop [] []
 
 
@@ -243,7 +243,7 @@ let compile_operand : Alloc.operand -> X86.operand =
     | Alloc.LReg reg -> Reg reg
     | Alloc.LStk x -> Ind3 (Lit (Int64.of_int x), Rbp)
     | Alloc.LLbl lbl -> Imm (Lbl lbl) (*Block Labels*)
-    | Alloc.LVoid -> Imm (Lit 0L)
+    | Alloc.LVoid -> failwith "Illegal Argument"
     end
 
 (* compiling call  ---------------------------------------------------------- *)
@@ -268,38 +268,38 @@ let compile_operand : Alloc.operand -> X86.operand =
 
 let arg_helper (n : int) : X86.operand =
   begin match n with
-  | 0 -> Reg Rdi
-  | 1 -> Reg Rsi
-  | 2 -> Reg Rdx
-  | 3 -> Reg Rcx
-  | 4 -> Reg R09
+  | 1 -> Reg Rdi
+  | 2 -> Reg Rsi
+  | 3 -> Reg Rdx
+  | 4 -> Reg Rcx
   | 5 -> Reg R08
+  | 6 -> Reg R09
   | x -> Ind3 (Lit (Int64.of_int (8 * (x-5))), Rbp)
   end
 
-
-
 let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
-  Printf.printf "elements : %d\n" (List.length os);
   let call_stream = [] in
-  let clean_up = [I (Callq, [compile_operand fo]); I (Addq, [Imm (Lit (Int64.of_int (8 * (List.length os)))); Reg Rsp])] in
   let rec call_helper (stream: x86stream) (o:(ty * Alloc.operand) list) (i: int) : x86stream =
     begin match o with
-    | [] -> []
+    | [] -> stream
     | h::tl ->
-       if i < 6 then call_helper (stream @ [I (Pushq, [arg_helper i]); I (Movq, [compile_operand (snd h); arg_helper i])]) tl (i - 1)
-       else  call_helper (stream @ [I (Movq, [compile_operand (snd h); arg_helper i])]) tl (i - 1)
+      begin match snd h with
+      | Alloc.Gid s ->
+        if i < 7 then call_helper ([I (Pushq, [arg_helper i]); I (Leaq, [Ind3 (Lbl s, Rip); arg_helper i])] @ stream) tl (i - 1)
+        else  call_helper (stream @ [I (Pushq, [Ind3 (Lbl s, Rip)])]) tl (i - 1)
+      | u ->
+        if i < 7 then call_helper ([I (Pushq, [arg_helper i]); I (Movq, [compile_operand u; arg_helper i])] @ stream) tl (i - 1)
+        else  call_helper (stream @ [I (Pushq, [compile_operand u])]) tl (i - 1)
+      end
     end in
   let rec clean_helper (stream: x86stream) (o:(ty * Alloc.operand) list) (i: int) : x86stream =
-    if i < List.length o then clean_helper (stream @ [I (Popq, [arg_helper i])]) o (i+1)
-    else stream
+    if i = 0 then stream
+    else clean_helper (stream @ [I (Popq, [arg_helper i])]) o (i - 1)
     in
     let temp = call_helper call_stream (List.rev os) (List.length os) in
-    clean_helper (temp @ clean_up) os 0
-
-
-
-
+    if List.length os < 6 then
+    clean_helper (temp @ [I (Callq, [compile_operand fo])]) os (List.length os)
+    else clean_helper (temp @ [I (Callq, [compile_operand fo]); I (Addq, [Imm (Lit (Int64.of_int (8 * (List.length os - 6)))); Reg Rsp])]) os 6
 
 (* compiling getelementptr (gep)  ------------------------------------------- *)
 
@@ -323,8 +323,38 @@ let compile_call (fo:Alloc.operand) (os:(ty * Alloc.operand) list) : x86stream =
    - Void, i8, and functions have undefined sizes according to LLVMlite.
      Your function should simply return 0 in those cases
 *)
+let get_simple_size (ty: ty) : int =
+  begin match ty with
+  | Void -> 0
+  | I1 -> 8
+  | I8 -> 0
+  | I64 -> 8
+  | Ptr ty -> 8
+  | Fun fty -> 0
+  | _ -> 0
+  end
+
+let get_array_size (i: int) (ty: ty) : int =
+  (i) * (get_simple_size (ty))
+
+let rec find_named_type (tdecls: (tid * ty) list) (id: tid) : ty =
+  begin match tdecls with
+  | (tid, ty) :: tl -> if (tid = id) then ty else find_named_type tl id
+  | [] -> failwith "not found"
+  end
+
 let rec size_ty tdecls t : int =
-failwith "size_ty not implemented"
+  let rec struct_helper tdecls (t: ty list) (i: int) : int =
+    begin match t with
+    | [] -> i
+    | h :: tl -> struct_helper tdecls tl (i + (size_ty tdecls h))
+    end in
+  begin match t with
+  | Array (i, ty) -> i * size_ty tdecls ty
+  | Struct tyl -> struct_helper tdecls tyl 0
+  | Namedt id -> size_ty tdecls (find_named_type tdecls id)
+  | x -> get_simple_size x
+  end
 
 (* Generates code that computes a pointer value.
 
@@ -352,11 +382,67 @@ failwith "size_ty not implemented"
    5. if the index is valid, the remainder of the path is computed as
       in (4), but relative to the type f the sub-element picked out
       by the path so far
+
+  The getelementptr instruction computes an address by indexing into
+     a datastructure, following a path of offsets.  It computes the
+     address based on the size of the data, which is dictated by the
+     data's type.
+
+     To compile getelmentptr, you must generate x86 code that performs
+     the appropriate arithemetic calculations.
 *)
 
 let compile_getelementptr tdecls (t:Ll.ty)
                           (o:Alloc.operand) (os:Alloc.operand list) : x86stream =
-failwith " unimplemented"
+let open Alloc in
+let stream = [] in
+let rec gep_helper tdecls (t: Ll.ty) (os: Alloc.operand list) (st: x86stream) : x86stream =
+  begin match os with
+  | [] -> st
+  | h :: tl ->
+    begin match h with
+    | Const n ->
+        begin match t with
+        | Ptr ty ->
+              gep_helper tdecls ty tl
+              (st @ [I (Addq, [Imm (Lit (Int64.mul n (Int64.of_int (size_ty tdecls ty)))); Reg R10])])
+        | Struct tyl ->
+              let rec get_struct_size tdecls tyl (count : int) (sum : int) : int =
+                begin match (tyl, count) with
+                | ([], _) -> failwith "Wrong operand"
+                | (_, 0) -> sum
+                | (h :: tl, c) -> get_struct_size tdecls tl (c - 1) (sum + (size_ty tdecls h))
+                end
+              in
+              gep_helper tdecls (List.nth tyl (Int64.to_int n)) tl
+              (st @ [I (Addq, [Imm (Lit (Int64.of_int (get_struct_size tdecls tyl ((Int64.to_int n)) 0))); Reg R10])])
+        | Array (i, ty) ->
+              gep_helper tdecls ty tl
+              (st @ [I (Addq, [Imm (Lit (Int64.mul n (Int64.of_int (size_ty tdecls ty)))); Reg R10])])
+        | Namedt l ->
+              gep_helper tdecls (find_named_type tdecls l) os st
+        | _ -> st
+        end
+    | c ->
+        begin match t with
+        | Array (i, ty) ->
+            gep_helper tdecls ty tl (st @ [I (Movq, [compile_operand c; Reg R11]); I (Imulq, [Imm (Lit (Int64.of_int (size_ty tdecls ty))); Reg R11]);
+            I (Addq, [Reg R11; Reg R10])])
+        | Ptr ty ->
+            gep_helper tdecls ty tl
+            (st @ [I (Movq, [compile_operand c; Reg R10]); I (Imulq, [Imm (Lit (Int64.of_int (size_ty tdecls ty))); Reg R10])])
+        | Namedt l ->
+            gep_helper tdecls (find_named_type tdecls l) os st
+        | _ -> failwith "Wrong Operandg"
+        end
+    end
+  end in
+  begin match o with
+  | Gid s ->
+      stream @ [I (Leaq, [Ind3 (Lbl s, Rip); Reg R10])] @ (gep_helper tdecls t os stream)
+  | _ ->
+      stream @ [I (Movq, [compile_operand o; Reg R10])] @ (gep_helper tdecls t os stream)
+  end
 
 (* compiling instructions within function bodies ---------------------------- *)
 
@@ -405,35 +491,6 @@ failwith " unimplemented"
    - Br should jump
 
    - Cbr branch should treat its operand as a boolean conditional
-
-   (* X86 locations *)
-   type loc =
-     | LVoid                       (* no storage *)
-     | LReg of X86.reg             (* x86 register *)
-     | LStk of int                 (* a stack offset from %rbp *)
-     | LLbl of X86.lbl             (* an assembler label *)
-
-   type operand =
-     | Null
-     | Const of int64
-     | Gid of X86.lbl
-     | Loc of loc
-
-   type insn =
-     | ILbl (* Label *)
-     | Binop of bop * ty * operand * operand (* i64 x i64 → i64 *)
-     | Alloca of ty (*	- → S *)
-     | Load of ty * operand (* S* → S *)
-     | Store of ty * operand * operand (* S x S* → void *)
-     | Icmp of Ll.cnd * ty * operand * operand (* S x S → i1 *)
-     | Call of ty * operand * (ty * operand) list (* S1(S2, ..., SN)* x S2 x ... x SN → S1 *)
-     | Bitcast of ty * operand * ty (* T1* → T2* *)
-     | Gep of ty * operand * operand list (* T1* x i64 x ... x i64 -> GEPTY(T1, OP1, ..., OPN) *)
-     | Ret of ty * operand option (* terminator *)
-     | Br of loc (* terminator *)
-     | Cbr of operand * loc * loc (* terminator *)
-
-   type fbody = (loc * insn) list
 *)
 
 let translate_binop (binop: bop) : X86.opcode =
@@ -449,33 +506,72 @@ let translate_cnd (c: Ll.cnd) : X86.cnd =
   | Sle -> Le  | Sgt -> Gt  | Sge -> Ge
   end
 
-(*let translate_icmp (icmp: cnd) : X86.opcode =
-  begin match icmp with
-  | Eq -> Addq   | Ne -> Subq   | Slt -> Imulq
-  | Sle -> Shlq  | Sgt -> Shrq  | Sge -> Sarq
-  end*)
-
 let insn_helper tdecls (l: Alloc.loc) (ins: Alloc.insn) : x86stream =
   let open Alloc in
   begin match (l, ins) with
   | (LVoid, Ret (t, o)) ->
      begin match o with
-     | Some c -> [I (Movq, [Reg Rbp; Reg Rsp]); I (Movq, [compile_operand c; Reg Rax]); I (Popq, [Reg Rbp]); I (Retq, [])]
-     | None -> [I (Movq, [Reg Rbp; Reg Rsp]); I (Popq, [Reg Rbp]); I (Retq, [])]
+     | Some c ->
+        [I (Movq, [Reg Rbp; Reg Rsp]);
+         I (Movq, [compile_operand c; Reg Rax]);
+         I (Popq, [Reg Rbp]);
+         I (Retq, [])]
+     | None ->
+        [I (Movq, [Reg Rbp; Reg Rsp]);
+         I (Popq, [Reg Rbp]);
+         I (Retq, [])]
      end
-  | (LVoid, Br lbl) -> [I (Jmp, [compile_operand (Loc lbl)])]
-  | (LVoid, Cbr (o,l,l')) -> [I (Cmpq, [Imm (Lit 0L); compile_operand o]); I (J Eq, [compile_operand (Loc l)]); I (Jmp, [compile_operand (Loc l')])]
-  | (LVoid, Store (t,o,o')) -> [I (Movq, [compile_operand o; compile_operand o'])]
-  | (LVoid, Call (t,o,args)) -> compile_call o args
-  | (LLbl l, _) -> [L (l, false)]
-  | (LStk i, Binop (b,t,o,o')) -> [I (Movq, [compile_operand o; Reg R10]); I (translate_binop b, [compile_operand o'; Reg R10]); I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
-  | (LStk i, Alloca t) -> [I (Movq, [Imm (Lit 8L); Ind3 (Lit (Int64.of_int i), Rbp)])]
-  | (LStk i, Load (t,o)) -> [I (Movq, [compile_operand o; Ind3 (Lit (Int64.of_int i), Rbp)])]
-  | (LStk i, Icmp (c,t,o,o')) -> [I (Movq, [compile_operand o'; Reg R10]); I (Cmpq, [compile_operand o; Reg R10]); I (Set (translate_cnd c), [Ind3 (Lit (Int64.of_int i), Rbp)]); I (Andq, [Imm (Lit 1L); Ind3 (Lit (Int64.of_int i), Rbp)])]
-  | (LStk i, Bitcast (t,o,t')) -> []
-  | (LStk i, Call (t,o,args)) -> (compile_call o args) @ [I (Movq, [Reg Rax; Ind3 (Lit (Int64.of_int i), Rbp)])]
-  | (LStk i, Gep (t,o,is)) -> []
-  | (_, _) -> []
+  | (LVoid, Br lbl) ->
+      [I (Jmp, [compile_operand (Loc lbl)])]
+  | (LVoid, Cbr (o,l,l')) ->
+      [I (Cmpq, [Imm (Lit 1L); compile_operand o]);
+       I (J Eq, [compile_operand (Loc l)]);
+       I (Jmp, [compile_operand (Loc l')])]
+  | (LVoid, Store (t,o,o')) ->
+      [I (Movq, [compile_operand o'; Reg R10]);
+       I (Movq, [compile_operand o; Reg R11]); I (Movq, [Reg R11; Ind2 R10])]
+  | (LLbl l, _) ->
+      [L (l, false)]
+  | (LStk i, Binop (b,t,o,o')) ->
+      [I (Movq, [compile_operand o; Reg R10]);
+       I (translate_binop b, [compile_operand o'; Reg R10]);
+       I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Alloca t) ->
+      [I (Subq, [Imm (Lit (Int64.of_int (size_ty tdecls t))); Reg Rsp]);
+       I (Movq, [Reg Rsp; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Load (t,o)) ->
+      begin match o with
+      | Gid s -> [I (Leaq, [Ind3 (Lbl s, Rip); Reg R10]);
+       I (Movq, [Ind2 R10; Reg R11]);
+       I (Movq, [Reg R11; Ind3 (Lit (Int64.of_int i), Rbp)])]
+      | _ ->
+      [I (Movq, [compile_operand o; Reg R10]);
+       I (Movq, [Ind2 R10; Reg R11]);
+       I (Movq, [Reg R11; Ind3 (Lit (Int64.of_int i), Rbp)])]
+       end
+  | (LStk i, Icmp (c,t,o,o')) ->
+      [I (Movq, [compile_operand o; Reg R10]);
+       I (Cmpq, [compile_operand o'; Reg R10]);
+       I (Set (translate_cnd c), [Ind3 (Lit (Int64.of_int i), Rbp)]);
+       I (Andq, [Imm (Lit 1L); Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Bitcast (t,o,t')) ->
+      begin match o with
+      | Gid s ->
+      [I (Leaq, [Ind3 (Lbl s, Rip); Reg R10]);
+       I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
+      | _ ->
+      [I (Movq, [compile_operand o; Reg R10]);
+       I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
+      end
+  | (LVoid, Call (t,o,args)) ->
+      compile_call o args
+  | (LStk i, Call (t,o,args)) ->
+      (compile_call o args) @
+      [I (Movq, [Reg Rax; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | (LStk i, Gep (t,o,os)) ->
+      (compile_getelementptr tdecls t o os) @
+      [I (Movq, [Reg R10; Ind3 (Lit (Int64.of_int i), Rbp)])]
+  | _ -> []
   end
 
 
@@ -489,95 +585,23 @@ let compile_fbody tdecls (af:Alloc.fbody) : x86stream =
   fbody_helper tdecls stream af
 
 
-
 (* compile_fdecl ------------------------------------------------------------ *)
 
 (* We suggest that you create a helper function that computes the
    layout for a given function declaration.
 
-
-     loc =
-       | LVoid                       (* no storage *)
-       | LReg of X86.reg             (* x86 register *)
-       | LStk of int                 (* a stack offset from %rbp *)
-       | LLbl of X86.lbl             (* an assembler label *)
-
-     fdecl = { fty: fty; param: uid list; cfg: cfg }
-     layout = (uid * Alloc.loc) list
-     type uid = string                       (* Local identifiers  *)
-
-     fty -> argument types and return type
-     param -> arguemnts
-     cfg -> control graph which is the program itself
-
-     define i64 @program(i64 %argc, i8** %arcv) {
-       // i64 -> return type
-       // %argc, %arcv -> LLbl of X86.lbl
-       %1 = mul i64 7, 7 -> LStk of int * insn
-       %2 = add i64 42, %argc -> LStk of int * insn
-       %3 = alloca i64 -> LStk of int * insn
-       store i64 %1, i64* %3 -> LVoid * insn
-       br label %l1 -> terminator
-     l1: -> LLbl of X86.lbl
-       %4 = icmp sle i64 64, %2 -> LStk of int * insn
-       %5 = load i64, i64* %3 -> LStk of int * insn
-       %6 = bitcast i64* %3 to i8* -> LStk of int * insn
-       %7 = getelementptr i8, i8* %6, i32 0 -> LStk of int * insn
-       %8 = sub i64 %5, 3 -> LStk of int * insn
-       store i64 %8, i64* %3 -> LVoid * insn
-       %9 = icmp sgt i64 %8, 0 -> LStk of int * insn
-       br i1 %9, label %l1, label %l2 -> terminator
-     l2: -> LLbl of X86.lbl
-       %10 = load i64, i64* %3 -> LStk of int * insn
-       ret i64 %10 -> terminator
-     }
-
-     (* LLVM IR types *)
-     type ty =
-       | Void                            (* mix of unit/bottom from C *)
-       | I1 | I8 | I64                   (* integer types             *)
-       | Ptr of ty                       (* t*                        *)
-       | Struct of ty list               (* { t1, t2, ... , tn }      *)
-       | Array of int * ty               (* [ NNN x t ]               *)
-       | Fun of fty                      (* t1, ..., tn -> tr         *)
-       | Namedt of tid                   (* named type aliases        *)
-
-     (* Function type: argument types and return type *)
-     and fty = ty list * ty
-
-     (* Control Flow Graph: a pair of an entry block and a set labeled blocks *)
-     type cfg = block * (lbl * block) list
-
-     (* Basic blocks *)
-     type block = { insns: (uid * insn) list; terminator: terminator }
-
-     (* Block terminators *)
-     type terminator =
-       | Ret of ty * operand option   (* ret i64 %s                     *)
-       | Br of lbl                    (* br label %lbl                  *)
-       | Cbr of operand * lbl * lbl   (* br i1 %s, label %l1, label %l2 *)
-
-
-          - each function argument should be copied into a stack slot
-          - in this (inefficient) compilation strategy, each local id
-            is also stored as a stack slot.
-          - uids associated with instructions that do not assign a value,
-            such as Store and a Call of a Void function should be associated
-            with Alloc.LVoid
-          - LLVMlite uids and labels share a namespace. Block labels you encounter
-            should be associated with Alloc.Llbl
-
-            layout = (uid * Alloc.loc) list
+    - each function argument should be copied into a stack slot
+    - in this (inefficient) compilation strategy, each local id
+      is also stored as a stack slot.
+    - uids associated with instructions that do not assign a value,
+      such as Store and a Call of a Void function should be associated
+      with Alloc.LVoid
+    - LLVMlite uids and labels share a namespace. Block labels you encounter
+      should be associated with Alloc.Llbl
 *)
 
 let stack_layout (f:Ll.fdecl) : layout =
   let cur_layout = [] in
-  (* f.param -> rdi, rsi, rdx, rcx, r09, r10, rbp에서 offset*)
-  (* f.cfg -> rbp에서 offset
-              call, store -> empty '_'
-              block 돌고
-              (lbl * block) list 돌고
-  *)
   let rec param_helper (cur_layout: (uid * Alloc.loc) list) (l: uid list) (inx: int): (uid * Alloc.loc) list =
     begin match l with
     | [] -> cur_layout
@@ -596,10 +620,12 @@ let stack_layout (f:Ll.fdecl) : layout =
     begin match l with
     | [] -> (cur_layout, inx)
     | h :: tl ->
-      begin match (fst h) with
-      | "store" -> block_helper (cur_layout @ [("_", Alloc.LVoid)]) tl inx
-      | "call" -> block_helper (cur_layout @ [("_", Alloc.LVoid)]) tl inx
-      | u -> block_helper (cur_layout @ [(u, Alloc.LStk (-8 * inx))]) tl (inx+1)
+      begin match h with
+      | (u, Store (t,o,o')) -> block_helper (cur_layout @ [(u, Alloc.LVoid)]) tl inx
+      | (u, Call (t,o,args)) ->
+          if t = Void then block_helper (cur_layout @ [(u, Alloc.LVoid)]) tl inx
+          else block_helper (cur_layout @ [(u, Alloc.LStk (-8 * inx))]) tl (inx+1)
+      | (u, _) -> block_helper (cur_layout @ [(u, Alloc.LStk (-8 * inx))]) tl (inx+1)
       end
     end in
   let rec cfg_helper (cur_layout: (uid * Alloc.loc) list) (l: (lbl * block) list) (inx: int): (uid * Alloc.loc) list =
@@ -610,15 +636,8 @@ let stack_layout (f:Ll.fdecl) : layout =
        cfg_helper (cur_layout @ [(fst h, Alloc.LLbl (Platform.mangle (fst h)))] @ (fst block)) tl (snd block)
     end in
   let temp = param_helper cur_layout f.param 1 in
-  let rec print_layout (l: (uid * Alloc.loc) list) =
-    begin match l with
-    | [] -> Printf.printf "done\n"
-    | h::tl -> Printf.printf "(%s, %s)\n" (fst h) (string_of_loc (snd h));
-               print_layout tl
-    end in
-  let temp2 = fst (block_helper temp ((fst f.cfg).insns) 1) in
-  print_layout temp2;
-  (cfg_helper temp2 (snd f.cfg) 1) @ [("_", Alloc.LVoid)]
+  let temp2 = block_helper temp ((fst f.cfg).insns) 1 in
+  cfg_helper (fst temp2) (snd f.cfg) (snd temp2)
 
 
 (* The code for the entry-point of a function must do several things:
@@ -654,28 +673,23 @@ let arg_loc (n : int) : X86.operand =
   | 1 -> Reg Rsi
   | 2 -> Reg Rdx
   | 3 -> Reg Rcx
-  | 4 -> Reg R09
-  | 5 -> Reg R08
-  | x -> Ind3 (Lit (Int64.of_int (8 * (x-5))), Rbp)
+  | 4 -> Reg R08
+  | 5 -> Reg R09
+  | x -> Ind3 (Lit (Int64.of_int (8 * (x-4))), Rbp)
   end
 
-
-
 let compile_fdecl tdecls (g:gid) (f:Ll.fdecl) : x86stream =
-  Printf.printf "Loop\n";
   let stream = [L (Platform.mangle g, true); I (Pushq, [Reg Rbp]); I (Movq, [Reg Rsp; Reg Rbp])] in
   let body = alloc_cfg (stack_layout f) f.cfg in
-  let rec print_body (body: Alloc.fbody) =
-    begin match body with
-    | [] -> ()
-    | (l, i)::tl -> Printf.printf "%s\n" (string_of_fbody (l, i) );
-               print_body tl
-    end in
-  print_body body;
-  Printf.printf "%s\n" (X86.string_of_prog (prog_of_x86stream (List.rev (stream @ (compile_fbody tdecls body)))));
-  List.rev (stream @ (compile_fbody tdecls body))
-
-
+  let rec function_count (body: Alloc.fbody) (cnt: int): x86stream =
+  begin match body with
+  | [] -> [I (Subq, [Imm (Lit (Int64.of_int (8 * cnt))); Reg Rsp])]
+  | h::tl ->
+    if fst h = Alloc.LVoid then function_count tl cnt
+    else function_count tl (cnt + 1)
+  end in
+  let temp  = stream @ (function_count body 0) in
+  List.rev (temp @ (compile_fbody tdecls body))
 
 
 (* compile_gdecl ------------------------------------------------------------ *)
