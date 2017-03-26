@@ -1,7 +1,6 @@
 ; generated from: atprograms/globals5.oat
 target triple = "x86_64-apple-macosx10.10.0"
 @s = global i8* c"hello!\00"
-@k = global i8* c"hello!\00"
 
 define i64 @program(i64 %argc, { i64, [0 x i8*] }* %args) {
   ret i64 17

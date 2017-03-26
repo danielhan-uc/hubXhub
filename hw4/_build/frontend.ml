@@ -287,14 +287,14 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
  *)
 let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
   begin match e.elt with
-  | CNull t -> ((cmp_ty t, GNull), [(gensym "n", (cmp_ty t, GNull))])
+  | CNull t -> ((cmp_ty t, GNull), [])
   | CBool b ->
     begin match b with
-    | true -> ((cmp_ty TBool, GInt (Int64.of_int 1)), [(gensym "b", (cmp_ty TBool, GInt (Int64.of_int 1)))])
-    | false -> ((cmp_ty TBool, GInt (Int64.of_int 0)), [(gensym "b", (cmp_ty TBool, GInt (Int64.of_int 0)))])
+    | true -> ((cmp_ty TBool, GInt (Int64.of_int 1)), [])
+    | false -> ((cmp_ty TBool, GInt (Int64.of_int 0)), [])
     end
-  | CInt i -> ((cmp_ty TInt, GInt i), [(gensym "i", (cmp_ty TInt, GInt i))])
-  | CStr s -> ((cmp_ty (TRef RString), GString "s"), [(gensym "s", (cmp_ty (TRef RString), GString s))])
+  | CInt i -> ((cmp_ty TInt, GInt i), [])
+  | CStr s -> ((Array(String.length s + 1, I8), GString s), [])
   | CArr (t, l) -> failwith "array not yet implemented"
   | _ -> failwith "not global exp"
   end
