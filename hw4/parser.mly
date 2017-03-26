@@ -43,6 +43,8 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 /*TYPES*/
 
 %token TBOOL /*bool*/
+%token TRUE   /*bool*/
+%token FALSE   /*bool*/
 
 /*LEFT ASSOCIATIVE BINARY OPERATION*/
 
@@ -61,12 +63,13 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 
 /*GLOBAL INITIALIZERS*/
 
-%token STRING /*s*/
-%token BOOL   /*bool*/
+
+%token FOR
 /*t[] {gexp1, .., gexpi}*/
 
 /*EXPRESSIONS*/
 
+%token NEW /* new */
 /*s*/
 /*true*/
 /*false*/
@@ -79,7 +82,13 @@ let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
 
 /*vdecl1,..vdecli*/
 
-
+%left IOR
+%left IAND
+%left OR
+%left AND
+%left NEQ EQEQ
+%left LT LTE GT GTE
+%left SHL SHR SAR
 %left PLUS DASH
 %left STAR
 %nonassoc BANG
@@ -157,30 +166,31 @@ gexp:
   | t=ty NULL  { loc $startpos $endpos @@ CNull t }
   | i=INT      { loc $startpos $endpos @@ CInt i }
   | s=STRING   { loc $startpos $endpos @@ CStr s }
-  | b=BOOL     { loc $startpos $endpos @@ CBool b }
-  | t=ty LBRACKET RBRACKET LBRACE gexps=list(gexp) RBRACE { CArr t gexps }
+  | TRUE     { loc $startpos $endpos @@ CBool true }
+  | FALSE    { loc $startpos $endpos @@ CBool false }
+  | t=ty LBRACKET RBRACKET LBRACE gexps=separated_list(COMMA, gexp) RBRACE { loc $startpos $endpos @@ CArr (t, gexps) }
 
 lhs:
   | id=IDENT            { loc $startpos $endpos @@ Id id }
   | e=exp LBRACKET i=exp RBRACKET
                         { loc $startpos $endpos @@ Index (e, i) }
+
 exp:
-  | i=INT               { loc $startpos $endpos @@ CInt i }
-  | t=ty NULL           { loc $startpos $endpos @@ CNull t }
-  | e1=exp b=bop e2=exp { loc $startpos $endpos @@ Bop (b, e1, e2) }
-  | u=uop e=exp         { loc $startpos $endpos @@ Uop (u, e) }
-  | id=IDENT            { loc $startpos $endpos @@ Id id }
-  | e=exp LBRACKET i=exp RBRACKET
-                        { loc $startpos $endpos @@ Index (e, i) }
   | id=IDENT LPAREN es=separated_list(COMMA, exp) RPAREN
                         { loc $startpos $endpos @@ Call (id,es) }
-  | LPAREN e=exp RPAREN { e }
+  | id=IDENT            { loc $startpos $endpos @@ Id (id) }
+  | i=INT               { loc $startpos $endpos @@ CInt i }
+  | t=ty NULL           { loc $startpos $endpos @@ CNull t }
+  | TRUE     { loc $startpos $endpos @@ CBool true }
+  | FALSE     { loc $startpos $endpos @@ CBool false }
   | s=STRING   { loc $startpos $endpos @@ CStr s }
-  | b=BOOL     { loc $startpos $endpos @@ CBool b }
-  | t=ty LBRACKET RBRACKET LBRACE exps=list(exp) RBRACE { CArr t exps }
-  | t=ty LBRACKET e=exp RBRACKET { NewArr t e}
-  | l=lhs      { l }
-  | g=gexp     { g }
+  | LPAREN e=exp RPAREN { e }
+  | e=exp LBRACKET i=exp RBRACKET
+                        { loc $startpos $endpos @@ Index (e, i) }
+  | NEW t=ty LBRACKET RBRACKET LBRACE exps=separated_list(COMMA, exp) RBRACE { loc $startpos $endpos @@ CArr (t, exps) }
+  | NEW t=ty LBRACKET e=exp RBRACKET { loc $startpos $endpos @@ NewArr (t, e)}
+  | u=uop e=exp      { loc $startpos $endpos @@ Uop (u, e) }
+  | e1=exp b=bop e2=exp { loc $startpos $endpos @@ Bop(b, e1, e2) }
 
 vdecl:
   | VAR id=IDENT EQ init=exp { (id, init) }
@@ -198,13 +208,13 @@ stmt:
   | RETURN e=exp SEMI   { loc $startpos $endpos @@ Ret(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block
                         { loc $startpos $endpos @@ While(e, b) }
-  | FOR LPAREN v=list(vdecl) SEMI e=exp SEMI s=stmt RPAREN b=block
+  | FOR LPAREN v=separated_list(COMMA, vdecl) SEMI e=exp SEMI s=stmt RPAREN b=block
                         { loc $startpos $endpos @@ For(v, Some e, Some s, b) }
-  | FOR LPAREN v=list(vdecl) SEMI e=exp SEMI RPAREN b=block
+  | FOR LPAREN v=separated_list(COMMA, vdecl) SEMI e=exp SEMI RPAREN b=block
                         { loc $startpos $endpos @@ For(v, Some e, None, b) }
-  | FOR LPAREN v=list(vdecl) SEMI SEMI s=stmt RPAREN b=block
+  | FOR LPAREN v=separated_list(COMMA, vdecl) SEMI SEMI s=stmt RPAREN b=block
                         { loc $startpos $endpos @@ For(v, None, Some s, b) }
-  | FOR LPAREN v=list(vdecl) SEMI SEMI RPAREN b=block
+  | FOR LPAREN v=separated_list(COMMA, vdecl) SEMI SEMI RPAREN b=block
                         { loc $startpos $endpos @@ For(v, None, None, b) }
 
 block:

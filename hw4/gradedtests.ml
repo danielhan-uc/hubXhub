@@ -16,7 +16,7 @@ let parse_test parse compare code ast =
   assert_eq_ast compare ast (fun () -> (parse Lexer.token lexbuf))
 
 let parse_consts =
-  [ ("parse consts test one", parse_test Parser.exp_top eq_exp "bool[] null" 
+  [ ("parse consts test one", parse_test Parser.exp_top eq_exp "bool[] null"
        (no_loc (CNull (TRef (RArray TBool)))))
   ; ("parse consts test two", parse_test Parser.exp_top eq_exp "42" (no_loc (CInt 42L)))
   ; ("parse consts test three", parse_test Parser.exp_top eq_exp "true" (no_loc (CBool true)))
@@ -96,11 +96,11 @@ let parse_tests = parse_consts
 
 let oat_file_test path args =
   let () = Platform.verb @@ Printf.sprintf "** Processing: %s\n" path in
-  
+
   let output_path = !Platform.output_path in
   let dot_ll_file = Platform.gen_name output_path "test" ".ll" in
   let exec_file = Platform.gen_name output_path "exec" "" in
-  let tmp_file = Platform.gen_name output_path "tmp" ".txt" in  
+  let tmp_file = Platform.gen_name output_path "tmp" ".txt" in
 
   let oat_ast = parse_oat_file path in
   let ll_ast = Frontend.cmp_prog oat_ast in
@@ -244,7 +244,7 @@ let tests : suite =
     GradedTest("path tests", 10, executed_oat_file path_tests);
     GradedTest("easy tests", 15, executed_oat_file easy_tests);
     GradedTest("medium tests", 10, executed_oat_file medium_tests);
-    GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests));    
+    GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests));
   ]
 
 let manual_tests : suite = [

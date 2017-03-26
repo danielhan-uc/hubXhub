@@ -11,11 +11,11 @@ open Ast
      of the instruction stream. You will find this useful for compiling string
      literals
    - E of uid * insn: allows you to emit an instruction that will be moved up
-     to the entry block of the current function. This will be useful for 
+     to the entry block of the current function. This will be useful for
      compiling local variable declarations
 *)
 
-type elt = 
+type elt =
   | L of Ll.lbl             (* block labels *)
   | I of uid * Ll.insn      (* instruction *)
   | T of Ll.terminator      (* block terminators *)
@@ -34,7 +34,7 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
         match e with
         | L l ->
            begin match term_opt with
-           | None -> 
+           | None ->
               if (List.length insns) = 0 then (gs, einsns, [], None, blks)
               else failwith @@ Printf.sprintf "build_cfg: block labeled %s has\
                                                no terminator" l
@@ -48,8 +48,8 @@ let cfg_of_stream (code:stream) : Ll.cfg * (Ll.gid * Ll.gdecl) list  =
       ) ([], [], [], None, []) code
     in
     match term_opt with
-    | None -> failwith "build_cfg: entry block has no terminator" 
-    | Some terminator -> 
+    | None -> failwith "build_cfg: entry block has no terminator"
+    | Some terminator ->
        let insns = einsns @ insns in
        ({insns; terminator}, blks), gs
 
@@ -83,14 +83,14 @@ end
 (* compiling OAT types ------------------------------------------------------ *)
 
 (* The mapping of source types onto LLVMlite is straightforward. Booleans and ints
-   are represented as the the corresponding integer types. OAT strings are 
+   are represented as the the corresponding integer types. OAT strings are
    pointers to bytes (I8). Arrays are the most interesting type: they are
    represented as pointers to structs where the first component is the number
    of elements in the following array.
 
    The trickiest part of this project will be satisfying LLVM's rudimentary type
    system. Recall that global arrays in LLVMlite need to be declared with their
-   length in the type to statically allocate the right amount of memory. The 
+   length in the type to statically allocate the right amount of memory. The
    global strings and arrays you emit will therefore have a more specific type
    annotation than the output of cmp_rty. You will have to carefully bitcast
    gids to satisfy the type checker.
@@ -140,21 +140,41 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
     ; ans_id, Bitcast(arr_ty, Id arr_id, ans_ty) ]
 
 
+let type_helper : Ast.exp -> Ll.ty = function
+  | CNull t -> cmp_ty t
+  | CBool b -> cmp_ty TBool
+  | CInt i -> cmp_ty TInt
+  | CStr s -> cmp_ty (TRef RString)
+  | CArr (t, l) -> cmp_ty (TRef (RArray t))
+  | _ -> failwith "type not implemented"
+
+let operand_helper : Ast.exp -> Ll.operand = function
+  | CNull t -> Null
+  | CBool b ->
+    begin match b with
+    | true -> Const (Int64.of_int 1)
+    | false -> Const (Int64.of_int 0)
+    end
+  | CInt i -> Const i
+  | Id id -> Id id
+  | _ -> failwith "type not implemented"
+
+
 
 (* Compile an expression exp in context c, outputting the Ll operand that will
    recieve the value of the expression, and the stream of instructions
-   implementing the expression. 
+   implementing the expression.
 
    Tips:
    - use the provided cmp_ty function!
 
-   - string literals (CStr s) should be hoisted. You'll need to bitcast the 
+   - string literals (CStr s) should be hoisted. You'll need to bitcast the
      resulting gid to (Ptr I8)
 
    - use the provided "oat_alloc_array" function to implement literal arrays
      (CArr) and the (NewArr) expressions
 
-   - we found it useful to write a helper function 
+   - we found it useful to write a helper function
      cmp_exp_as_ty : Ctxt.t -> Ast.exp node -> Ll.ty -> Ll.operand * stream
      that compiles an expression and optionally inserts a bitcast to the
      desired Ll type. This is useful for dealing with OAT identifiers that
@@ -162,7 +182,7 @@ let oat_alloc_array (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
 *)
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
-failwith "cmp_exp unimplemented"    
+failwith "cmp_exp unimplemented"
 
 (* Compile a statement in context c with return typ rt. Return a new context,
    possibly extended with new local bindings, and the instruction stream
@@ -176,9 +196,9 @@ failwith "cmp_exp unimplemented"
    - for local variable declarations, you will need to emit Allocas in the
      entry block of the current function using the E() constructor.
 
-   - don't forget to add a bindings to the context for local variable 
+   - don't forget to add a bindings to the context for local variable
      declarations
-   
+
    - you can avoid some work by translating For loops to the corresponding
      While loop, building the AST and recursively calling cmp_stmt
 
@@ -191,11 +211,15 @@ failwith "cmp_exp unimplemented"
 
  *)
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
-  failwith "cmp_stmt not implemented"
+  begin match stmt.elt with
+  | Ret None -> (c, [T (Ret (Void, None))])
+  | Ret (Some x) -> (c, [T (Ret (type_helper x.elt, Some (operand_helper x.elt)))])
+  | _ -> failwith "not yet implemented"
+  end
 
 (* Compile a series of statements *)
 and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
-  snd @@ List.fold_left (fun (c, code) s -> 
+  snd @@ List.fold_left (fun (c, code) s ->
       let c, stmt_code = cmp_stmt c rt s in
       c, code >@ stmt_code
     ) (c,[]) stmts
@@ -207,7 +231,14 @@ and cmp_block (c:Ctxt.t) (rt:Ll.ty) (stmts:Ast.block) : stream =
    Only a small subset of OAT expressions can be used as global initializers
    in well-formed programs (The constructors starting with C). *)
 let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  failwith "cmp_global_ctxt unimplemented"
+  let open Ctxt in
+  let rec global_ctxt_helper (ct:Ctxt.t) (pr:Ast.prog) : Ctxt.t =
+    begin match pr with
+    | [] -> ct
+    | (Gvdecl a) :: rest -> global_ctxt_helper (add ct a.elt.name (type_helper a.elt.init.elt, Gid a.elt.name)) rest
+    | (Gfdecl a) :: rest -> global_ctxt_helper (add ct a.elt.name (cmp_ty a.elt.rtyp, Gid a.elt.name)) rest
+    end in
+  global_ctxt_helper c p
 
 
 (* Compile a function declaration in global context c. Return the LLVMlite cfg
@@ -219,10 +250,28 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
    2. Store the function arguments in their corresponding alloca'd stack slot
    3. Extend the context with bindings for function variables
    3. Compile the body of the function using cmp_block
-   4. Use cfg_of_stream to produce a LLVMlite cfg from 
+   4. Use cfg_of_stream to produce a LLVMlite cfg from
  *)
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_fdecl not implemented"
+  let open Ctxt in
+  let rec f_type_helper (args: (ty * id) list) (tyl : Ll.ty list) (c:Ctxt.t) : Ll.ty list * Ctxt.t =
+    begin match args with
+    | [] -> (tyl, c)
+    | (t, i) :: tl -> f_type_helper tl (tyl @ [cmp_ty t]) (add c i (cmp_ty t, Id i))
+    end in
+  let helper_result = f_type_helper f.elt.args [] c in
+  let fty_final = (fst helper_result, cmp_ty f.elt.rtyp) in
+  let new_c = snd helper_result in
+  let rec f_param_helper (args: (ty * id) list) (uidl : uid list) : uid list =
+    begin match args with
+    | [] -> uidl
+    | (t, i) :: tl -> f_param_helper tl (uidl @ [i])
+    end in
+  let param_final = f_param_helper f.elt.args [] in
+  let cfg_stream = cfg_of_stream (cmp_block new_c (cmp_ty f.elt.rtyp) f.elt.body) in
+  let global_final = snd cfg_stream in
+  ({fty=fty_final; param=param_final; cfg=(fst cfg_stream)}, global_final)
+
 
 
 (* Compile a global initializer, returning the resulting LLVMlite global
@@ -237,7 +286,18 @@ let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) lis
      be an array of pointers to arrays emitted as additional global declarations
  *)
 let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
-  failwith "cmp_init not implemented"
+  begin match e.elt with
+  | CNull t -> ((cmp_ty t, GNull), [(gensym "n", (cmp_ty t, GNull))])
+  | CBool b ->
+    begin match b with
+    | true -> ((cmp_ty TBool, GInt (Int64.of_int 1)), [(gensym "b", (cmp_ty TBool, GInt (Int64.of_int 1)))])
+    | false -> ((cmp_ty TBool, GInt (Int64.of_int 0)), [(gensym "b", (cmp_ty TBool, GInt (Int64.of_int 0)))])
+    end
+  | CInt i -> ((cmp_ty TInt, GInt i), [(gensym "i", (cmp_ty TInt, GInt i))])
+  | CStr s -> ((cmp_ty (TRef RString), GString "s"), [(gensym "s", (cmp_ty (TRef RString), GString s))])
+  | CArr (t, l) -> failwith "array not yet implemented"
+  | _ -> failwith "not global exp"
+  end
 
 
 (* Oat initial context ------------------------------------------------------ *)
@@ -262,17 +322,17 @@ let builtins =
 (* Compile a OAT program to LLVMlite *)
 let cmp_prog (p:Ast.prog) : Ll.prog =
   (* add built-in functions to context *)
-  let init_ctxt = 
-    List.fold_left (fun c (i, t) -> 
+  let init_ctxt =
+    List.fold_left (fun c (i, t) ->
         Ctxt.add c i (t, Gid i)
       ) Ctxt.empty builtins in
   (* build global variable context *)
   let c = cmp_global_ctxt init_ctxt p in
   (* compile functions and global variables *)
-  let fdecls, gdecls = 
+  let fdecls, gdecls =
     List.fold_right (fun d (fs, gs) ->
         match d with
-        | Ast.Gvdecl { elt=gd } -> 
+        | Ast.Gvdecl { elt=gd } ->
            let ll_gd, gs' = cmp_gexp gd.init in
            (fs, (gd.name, ll_gd)::gs' @ gs)
         | Ast.Gfdecl fd ->

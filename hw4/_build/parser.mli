@@ -6,24 +6,40 @@ type token =
   | VAR
   | TVOID
   | TSTRING
+  | TRUE
   | TINT
   | TILDE
+  | TBOOL
   | STRING of (string)
   | STAR
+  | SHR
+  | SHL
   | SEMI
+  | SAR
   | RPAREN
   | RETURN
   | RBRACKET
   | RBRACE
   | PLUS
+  | OR
   | NULL
+  | NEW
+  | NEQ
+  | LTE
+  | LT
   | LPAREN
   | LBRACKET
   | LBRACE
+  | IOR
   | INT of (int64)
   | IF
   | IDENT of (string)
+  | IAND
+  | GTE
+  | GT
   | GLOBAL
+  | FOR
+  | FALSE
   | EQEQ
   | EQ
   | EOF
@@ -31,6 +47,7 @@ type token =
   | DASH
   | COMMA
   | BANG
+  | AND
 
 (* This exception is raised by the monolithic API functions. *)
 

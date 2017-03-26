@@ -11,9 +11,9 @@ type id = string
 (* OAT types *)
 type ty =                               (* types of identifiers and exprs *)
   | TVoid
-  | TBool 
-  | TInt 
-  | TRef of rty                         
+  | TBool
+  | TInt
+  | TRef of rty
   | TFun of fty
 
 and rty =                               (* reference types *)
@@ -26,13 +26,13 @@ and fty = ty list * ty                  (* function types *)
 type unop =                             (* primitive operations *)
   | Neg | Lognot | Bitnot
 
-type binop =                           
+type binop =
   | Add | Sub | Mul
   | Eq | Neq | Lt | Lte | Gt | Gte
   | And | Or | IAnd | IOr
   | Shl | Shr | Sar
 
-type exp =  
+type exp =
   | CNull of ty                         (* null literal for any TRef *)
   | CBool of bool                       (* bool literal *)
   | CInt of int64                       (* int literal *)
@@ -56,7 +56,7 @@ type stmt =
   | SCall of id * exp node list         (* call a void function *)
   | If of exp node * block * block      (* conditional *)
   | For of vdecl list * exp node option (* for loop *)
-           * stmt node option * block  
+           * stmt node option * block
   | While of exp node * block           (* while loop *)
 
 (* blocks of statements *)
@@ -66,14 +66,14 @@ and block = stmt node list
 type gdecl =
   { name : id
   ; init : exp node
-  } 
+  }
 
 (* global function declarations *)
 type fdecl =
   { rtyp : ty
   ; name : id
   ; args : (ty * id) list
-  ; body : block        
+  ; body : block
   }
 
 (* OAT programs *)
