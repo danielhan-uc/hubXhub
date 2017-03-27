@@ -1,21 +1,20 @@
-; generated from: atprograms/easyrun3.oat
+; generated from: atprograms/easyrun6.oat
 target triple = "x86_64-apple-macosx10.10.0"
 define i64 @program(i64 %argc, { i64, [0 x i8*] }* %argv) {
-  %x = alloca i64
-  %i = alloca i64
-  store i64 0, i64* %x
-  store i64 0, i64* %i
-  br label %_pre5
-_pre5:
-  %_id6 = load i64, i64* %i
-  %_bop7 = icmp slt i64 %_id6, 10
-  %_test2 = icmp eq i1 %_bop7, 0
-  br i1 %_test2, label %_post3, label %_body4
-_body4:
-  br label %_pre5
-_post3:
-  %_id15 = load i64, i64* %x
-  ret i64 %_id15
+  %_uop23 = xor i1 1, 1
+  %_uop24 = sub i64 0, 4
+  %_bop25 = add i64 %_uop24, 5
+  %_bop26 = icmp sgt i64 %_bop25, 0
+  %_bop27 = mul i64 6, 4
+  %_bop28 = icmp slt i64 %_bop27, 25
+  %_bop29 = and i1 %_bop26, %_bop28
+  %_bop30 = or i1 %_uop23, %_bop29
+  %_test22 = icmp eq i1 %_bop30, 0
+  br i1 %_test22, label %_else20, label %_then19
+_then19:
+  br label %_merge21
+_else20:
+  br label %_merge21
 }
 
 

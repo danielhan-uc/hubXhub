@@ -157,7 +157,40 @@ let operand_helper : Ast.exp -> Ll.operand = function
     end
   | CInt i -> Const i
   | Id id -> Id id
-  | _ -> failwith "type not implemented"
+  | _ -> failwith "operand not implemented"
+
+
+  type cmp_exp_return_value =
+    { ty: Ll.ty
+    ; operand: Ll.operand
+    ; stream: stream
+    }
+
+  let get_ll_bop (bop: binop) : Ll.bop =
+    begin match bop with
+    | Add -> Ll.Add
+    | Mul -> Ll.Mul
+    | Sub -> Ll.Sub
+    | Shl -> Ll.Shl
+    | Shr -> Ll.Lshr
+    | Sar -> Ll.Ashr
+    | IAnd -> Ll.And
+    | IOr -> Ll.Or
+    | And -> Ll.And
+    | Or -> Ll.Or
+    | _ -> failwith "not a ll binary operator"
+    end
+
+  let get_ll_cnd (bop: binop) : Ll.cnd =
+    begin match bop with
+    | Eq -> Ll.Eq
+    | Neq -> Ll.Ne
+    | Lt -> Ll.Slt
+    | Lte -> Ll.Sle
+    | Gt -> Ll.Sgt
+    | Gte -> Ll.Sge
+    | _ -> failwith "not a ll conditional operator"
+    end
 
 
 
@@ -180,9 +213,53 @@ let operand_helper : Ast.exp -> Ll.operand = function
      desired Ll type. This is useful for dealing with OAT identifiers that
      correspond to gids that don't quite have the type you want
 *)
+let get_first (a,_,_) = a
+let get_second (_,a,_) = a
+let get_third (_,_,a) = a
 
 let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
-failwith "cmp_exp unimplemented"
+    begin match exp.elt with
+    | CNull t -> cmp_ty t, Ll.Null, []
+    | CBool b -> cmp_ty TBool, operand_helper (CBool b), []
+    | CInt i -> cmp_ty TInt, operand_helper (CInt i), []
+    | CStr s ->
+      let gid = gensym "str" in
+      (Ptr (Array (String.length s + 1, I8)), Gid gid, [G (gid, (Array (String.length s + 1, I8), GString s))])
+    | CArr (t, l) -> failwith "cmp_exp: CArr not implemented"
+    | Id id ->
+      let (ll_rtyp, ctxt_id) = Ctxt.lookup id c in
+      let uid = gensym "id" in
+      ll_rtyp, Id uid, [I(uid, Load(Ptr ll_rtyp, ctxt_id))]
+    | NewArr (t, exp) -> failwith "cmp_exp: NewArr not implemented"
+    | Index (exp1, exp2) -> failwith "cmp_exp: Index not implemented"
+    | Call (id, l) -> failwith "cmp_exp: Call not implemented"
+    | Bop (bop, exp1, exp2) ->
+      let temp1 = cmp_exp c exp1 in
+      let temp2 = cmp_exp c exp2 in
+      let ll_rtyp = cmp_ty (get_third (typ_of_binop bop)) in
+      let ll_optyp = cmp_ty (get_second (typ_of_binop bop)) in
+      let uid = gensym "bop" in
+      begin match bop with
+      | Add | Sub | Mul | Shl | Shr | Sar | IAnd | IOr | And | Or ->
+        (ll_rtyp, Id uid, [I (uid, Binop(get_ll_bop bop, ll_optyp, get_second temp1, get_second temp2))]
+        @(get_third temp2) @ (get_third temp1))
+      | Eq | Neq | Lt | Lte | Gt | Gte ->
+        (ll_rtyp, Id uid, [I (uid, Icmp(get_ll_cnd bop, ll_optyp, get_second temp1, get_second temp2))]
+        @(get_third temp2) @ (get_third temp1))
+      end
+    | Uop (uop, exp) ->
+      let temp = cmp_exp c exp in
+      let ll_rtyp = cmp_ty (snd (typ_of_unop uop)) in
+      let uid = gensym "uop" in
+      begin match uop with
+      | Neg ->
+        (ll_rtyp, Id uid, [I(uid, Binop(Sub, ll_rtyp, Const (Int64.of_int 0), get_second temp))] @ (get_third temp))
+      | Bitnot ->
+        (ll_rtyp, Id uid, [I(uid, Binop(Xor, ll_rtyp, Const (Int64.of_int (-1)), get_second temp))] @ (get_third temp))
+      | Lognot ->
+        (ll_rtyp, Id uid, [I(uid, Binop(Xor, ll_rtyp, Const (Int64.of_int 1), get_second temp))] @ (get_third temp))
+      end
+    end
 
 (* Compile a statement in context c with return typ rt. Return a new context,
    possibly extended with new local bindings, and the instruction stream
@@ -213,8 +290,49 @@ failwith "cmp_exp unimplemented"
 let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
   begin match stmt.elt with
   | Ret None -> (c, [T (Ret (Void, None))])
-  | Ret (Some x) -> (c, [T (Ret (type_helper x.elt, Some (operand_helper x.elt)))])
-  | _ -> failwith "not yet implemented"
+  | Ret (Some x) ->
+    let x_compile = cmp_exp c x in
+    (c, [T (Ret (get_first x_compile, Some (get_second x_compile)))] @ (get_third x_compile))
+  | Assn (e1, e2) ->
+    begin match e1.elt with
+    | Id id ->
+      let e2_compile = cmp_exp c e2 in
+      let ptr = Ctxt.lookup id c in
+      (c, [I (id, Store (get_first e2_compile, get_second e2_compile, snd ptr))] @ (get_third e2_compile))
+    | Index (exp1, exp2) -> failwith "Index not yet implemented"
+    | _ -> failwith "Illegal lhs"
+    end
+  | Decl (vdecl) ->
+    let uid = fst vdecl in
+    let exp_compile = cmp_exp c (snd vdecl) in
+    let update_ctxt = Ctxt.add c uid (get_first exp_compile, Id uid) in
+    (update_ctxt, [E (uid, Alloca (get_first exp_compile))] @ [I (uid, Store (get_first exp_compile, get_second exp_compile, Id uid))] @ (get_third exp_compile))
+  | SCall (id, explist) -> failwith "SCall not yet implemented"
+  | If (exp, block1, block2) ->
+    let rec stream_of_block (c:Ctxt.t) (rt:Ll.ty) (b:block) : stream =
+      begin match b with
+      | [] -> []
+      | h::tl -> (stream_of_block c rt tl) @ (snd (cmp_stmt c rt h))
+      end in
+    let b1_stream = stream_of_block c rt block1 in
+    let b2_stream = stream_of_block c rt block2 in
+    let then_block = gensym "then" in
+    let else_block = gensym "else" in
+    let merge = gensym "merge" in
+    let test = gensym "test" in
+    let cond = cmp_exp c exp in
+    (c, [L merge] @ b2_stream @ [L merge ; T (Br merge); L else_block] @ b1_stream
+    @ [T (Br merge); L then_block; T (Cbr (Id test, else_block, then_block));
+    I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero))] @ (get_third cond))
+  | For (vdecls, exp_option, stmt_option, block) -> failwith "For not yet implemented"
+  | While (exp, block) ->
+    let test = gensym "test" in
+    let lpost = gensym "post" in
+    let lbody = gensym "body" in
+    let lpre = gensym "pre" in
+    let cond = cmp_exp c exp in
+    (c, [L lpost] @ (cmp_block c rt block) @ [T (Br lpre); L lbody; T (Cbr (Id test, lpost, lbody));
+      I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero))] @ (get_third cond) @ [L lpre ; T (Br lpre)])
   end
 
 (* Compile a series of statements *)
