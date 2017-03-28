@@ -121,7 +121,7 @@ let executed_oat_file tests =
 let easiest_tests = [
   ("atprograms/easyrun1.oat", "", "17");
   ("atprograms/easyrun2.oat", "", "35");
-  (* ("atprograms/easyrun3.oat", "", "73"); *)
+  ("atprograms/easyrun3.oat", "", "73");
   ("atprograms/easyrun4.oat", "", "6");
   ("atprograms/easyrun5.oat", "", "212");
   ("atprograms/easyrun6.oat", "", "9");
@@ -238,7 +238,8 @@ let old_student_tests = [
 ]
 
 let tests : suite =
-  [ GradedTest("parse tests", 15, parse_tests);
+  [
+    GradedTest("parse tests", 15, parse_tests);
     GradedTest("easiest tests", 15, executed_oat_file easiest_tests);
     GradedTest("globals tests", 15, executed_oat_file globals_tests);
     GradedTest("path tests", 10, executed_oat_file path_tests);

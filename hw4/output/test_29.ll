@@ -714,7 +714,7 @@ _body6540:
   %_load6552 = load i64, i64* %_ptr6551
   %_id6553 = load i1, i1* @kesha_to_fling
   %_bitcast6556 = bitcast [11 x i8]* @professor to i8*
-  %_fun6548 = call { i64, [0 x i64] }* @asian_brother_of_foo_named_fui(i8* %_bitcast6556, i1 %_id6553, i64 %_load6552)
+  %_fun6548 = call { i64, [0 x i64] }* @asian_brother_of_foo_named_fui(i64 %_bitcast6556, i1 %_id6553, i8* %_load6552)
   %_ptr6557 = getelementptr { i64, [0 x i64] }, { i64, [0 x i64] }* %_fun6548, i32 0, i32 1, i32 1
   %_load6558 = load i64, i64* %_ptr6557
   %_id6559 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_emptyland6515
@@ -745,25 +745,25 @@ _post6520:
   %_str6580 = bitcast [20 x i8]* @_str6579 to i8*
   call void @print_string(i8* %_str6580)
   %_id6583 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_territory_a6283
-  %_fun6582 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6583, i64 4, i64 4)
+  %_fun6582 = call i64 @connected(i64 %_id6583, i64 4, { i64, [0 x { i64, [0 x i64] }*] }* 4)
   store i64 %_fun6582, i64* %_a6581
   %_id6587 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_territory_b6334
-  %_fun6586 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6587, i64 3, i64 5)
+  %_fun6586 = call i64 @connected(i64 %_id6587, i64 3, { i64, [0 x { i64, [0 x i64] }*] }* 5)
   store i64 %_fun6586, i64* %_b6585
   %_id6591 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_territory_c6379
-  %_fun6590 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6591, i64 3, i64 3)
+  %_fun6590 = call i64 @connected(i64 %_id6591, i64 3, { i64, [0 x { i64, [0 x i64] }*] }* 3)
   store i64 %_fun6590, i64* %_c6589
   %_id6595 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_none_conquered6412
-  %_fun6594 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6595, i64 4, i64 2)
+  %_fun6594 = call i64 @connected(i64 %_id6595, i64 4, { i64, [0 x { i64, [0 x i64] }*] }* 2)
   store i64 %_fun6594, i64* %_none6593
   %_id6599 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_all_conquered6461
-  %_fun6598 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6599, i64 6, i64 6)
+  %_fun6598 = call i64 @connected(i64 %_id6599, i64 6, { i64, [0 x { i64, [0 x i64] }*] }* 6)
   store i64 %_fun6598, i64* %_all6597
   %_id6603 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_island6508
-  %_fun6602 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6603, i64 1, i64 1)
+  %_fun6602 = call i64 @connected(i64 %_id6603, i64 1, { i64, [0 x { i64, [0 x i64] }*] }* 1)
   store i64 %_fun6602, i64* %_i6601
   %_id6607 = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %_emptyland6515
-  %_fun6606 = call i64 @connected({ i64, [0 x { i64, [0 x i64] }*] }* %_id6607, i64 0, i64 0)
+  %_fun6606 = call i64 @connected(i64 %_id6607, i64 0, { i64, [0 x { i64, [0 x i64] }*] }* 0)
   store i64 %_fun6606, i64* %_e6605
   %_id6613 = load i64, i64* %_a6581
   %_bop6615 = icmp eq i64 %_id6613, 3

@@ -144,8 +144,8 @@ let type_helper : Ast.exp -> Ll.ty = function
   | CNull t -> cmp_ty t
   | CBool b -> cmp_ty TBool
   | CInt i -> cmp_ty TInt
-  | CStr s -> cmp_ty (TRef RString)
-  | CArr (t, l) -> cmp_ty (TRef (RArray t))
+  | CStr s -> Array (String.length s + 1, I8)
+  | CArr (t, l) -> Struct [I64; Array(List.length l, cmp_ty t)]
   | _ -> failwith "type not implemented"
 
 let operand_helper : Ast.exp -> Ll.operand = function
@@ -224,15 +224,113 @@ let rec cmp_exp (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.operand * stream =
     | CInt i -> cmp_ty TInt, operand_helper (CInt i), []
     | CStr s ->
       let gid = gensym "str" in
-      (Ptr (Array (String.length s + 1, I8)), Gid gid, [G (gid, (Array (String.length s + 1, I8), GString s))])
-    | CArr (t, l) -> failwith "cmp_exp: CArr not implemented"
+      let strptr = gensym "str" in
+      (Ptr I8, Id strptr, [I (strptr, Bitcast (Ptr (Array (String.length s + 1, I8)), Gid gid, Ptr I8));
+        G (gid, (Array (String.length s + 1, I8), GString s))])
+    | CArr (t, l) -> (* ty * exp node list*)
+      let init_array = oat_alloc_array t (Const (Int64.of_int (List.length l))) in
+      let rec store_stream (l : exp node list) (i : int) : stream =
+        begin match l with
+        | [] -> []
+        | h::tl ->
+          let uid = gensym "elt" in
+          let dummy = gensym "temp" in
+          let compile = cmp_exp c h in
+          (store_stream tl (i+1)) @ [I (dummy, Store (cmp_ty t, get_second compile, Id uid));
+            I (uid, Gep (get_first init_array, get_second init_array, [Const Int64.zero; Const Int64.one; Const (Int64.of_int i)]))] @ (get_third compile)
+        end in
+        get_first init_array, get_second init_array, (store_stream l 0) @ (get_third init_array)
     | Id id ->
       let (ll_rtyp, ctxt_id) = Ctxt.lookup id c in
       let uid = gensym "id" in
-      ll_rtyp, Id uid, [I(uid, Load(Ptr ll_rtyp, ctxt_id))]
-    | NewArr (t, exp) -> failwith "cmp_exp: NewArr not implemented"
-    | Index (exp1, exp2) -> failwith "cmp_exp: Index not implemented"
-    | Call (id, l) -> failwith "cmp_exp: Call not implemented"
+      let uid2 = gensym "bitcast" in
+      begin match ll_rtyp with
+      | Array (i, t) ->
+        begin match t with
+        | I8 -> Ptr I8, Id uid2, [I (uid2, Bitcast (Ptr (Array (i, t)), ctxt_id, Ptr I8))]
+        | t -> Ptr (Struct [I64; Array (0, t)]), Id uid2, [I (uid2, (Bitcast (Ptr (Array (i, t)), ctxt_id, Ptr (Struct [I64; Array (0, t)]))))]
+        end
+      | Struct [I64; Array(l, t)] -> Ptr (Struct [I64; Array (0, t)]), Id uid2, [I (uid2, (Bitcast (Ptr (Struct [I64; Array(l, t)]), ctxt_id, Ptr (Struct [I64; Array (0, t)]))))]
+      | t -> t, Id uid, [I(uid, Load(Ptr t, ctxt_id))]
+      end
+    | NewArr (t, exp) ->
+      let compile_exp = cmp_exp c exp in
+      let init_array = oat_alloc_array t (get_second compile_exp) in
+      get_first init_array, get_second init_array, (get_third init_array) @ (get_third compile_exp)
+    | Index (exp1, exp2) ->
+      let compile_exp1 = cmp_exp c exp1 in
+      let compile_exp2 = cmp_exp c exp2 in
+      let uid = gensym "ptr" in
+      let loaded_id = gensym "load" in
+      begin match exp1.elt with
+      | CArr (t, l) -> cmp_ty t, Id loaded_id, [I (loaded_id, Load (Ptr (cmp_ty t), Id uid));
+        I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+        @ (get_third compile_exp2) @ (get_third compile_exp1)
+      | NewArr (t, exp) -> cmp_ty t, Id loaded_id, [I (loaded_id, Load (Ptr (cmp_ty t), Id uid));
+        I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+        @ (get_third compile_exp2) @ (get_third compile_exp1)
+      | Id id ->
+        let (ll_rtyp, ctxt_id) = Ctxt.lookup id c in
+        begin match ll_rtyp with
+        | Array (i, t) ->
+          t, Id loaded_id, [I (loaded_id, Load (Ptr t, Id uid));
+          I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+          @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | Struct [I64; Array(l, t)] ->
+          t, Id loaded_id, [I (loaded_id, Load (Ptr t, Id uid));
+          I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+          @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | Ptr (Struct [I64; Array(l, t)]) ->
+          t, Id loaded_id, [I (loaded_id, Load (Ptr t, Id uid));
+          I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+          @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | _ -> failwith "not yet implemented"
+        end
+      | Call (id,l) ->
+        let (ll_rtyp, ctxt_id) = Ctxt.lookup_function id c in
+        begin match ll_rtyp with
+        | (_, Array (i, t)) ->
+          t, Id loaded_id, [I (loaded_id, Load (Ptr t, Id uid));
+          I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+          @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | (_, Ptr (Struct [I64;Array(0, t)])) ->
+          t, Id loaded_id, [I (loaded_id, Load (Ptr t, Id uid));
+          I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+          @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | _ -> failwith "not yet implemented"
+        end
+      | Index (e1, e2) ->
+        begin match get_first compile_exp1 with
+        | Array (i, ty) ->
+        ty, Id loaded_id, [I (loaded_id, Load (Ptr ty, Id uid));
+        I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+        @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | Struct [I64; Array(l, ty)] ->
+        ty, Id loaded_id, [I (loaded_id, Load (Ptr ty, Id uid));
+        I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+        @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | Ptr (Struct [I64; Array(l, ty)]) ->
+        ty, Id loaded_id, [I (loaded_id, Load (Ptr ty, Id uid));
+        I (uid, Gep (get_first compile_exp1, get_second compile_exp1, [Const Int64.zero; Const Int64.one; get_second compile_exp2]))]
+        @ (get_third compile_exp2) @ (get_third compile_exp1)
+        | _ -> failwith "nono"
+        end
+      | _ -> failwith "no"
+      end
+    | Call (id, l) ->
+      let (ll_ftyp, ctxt_id) = Ctxt.lookup_function id c in
+      let fid = gensym "fun" in
+      let rec args_list (c:Ctxt.t) (tl: Ll.ty list) (el: exp node list): stream * (Ll.ty * operand) list =
+        begin match (tl, el) with
+        | [],[] -> [], []
+        | h1::t1, h2::t2 ->
+          let temp = (args_list c t1 t2) in
+          let exp_comp = cmp_exp c h2 in
+          (get_third exp_comp) @ (fst temp), (h1, get_second exp_comp) :: (snd temp)
+        | _ -> failwith "not enough args"
+        end in
+      let args = args_list c (List.rev (fst ll_ftyp)) l in
+      snd ll_ftyp, Id fid, [I(fid, Call (snd ll_ftyp, Gid id, snd args))] @ (fst args)
     | Bop (bop, exp1, exp2) ->
       let temp1 = cmp_exp c exp1 in
       let temp2 = cmp_exp c exp2 in
@@ -299,40 +397,84 @@ let rec cmp_stmt (c:Ctxt.t) (rt:Ll.ty) (stmt:Ast.stmt node) : Ctxt.t * stream =
       let e2_compile = cmp_exp c e2 in
       let ptr = Ctxt.lookup id c in
       (c, [I (id, Store (get_first e2_compile, get_second e2_compile, snd ptr))] @ (get_third e2_compile))
-    | Index (exp1, exp2) -> failwith "Index not yet implemented"
+    | Index (exp1, exp2) ->
+      let e2_compile = cmp_exp c e2 in
+      let (ll_type, ll_opnd, str1) = cmp_exp c exp1 in
+      let (_,e2_opnd,str2) = cmp_exp c exp2 in
+      let sid = gensym "store" in
+      let gepid = gensym "gep" in
+      (c, [I (sid, Store (get_first e2_compile, get_second e2_compile, Id gepid));
+       I (gepid, Gep (ll_type, ll_opnd, [Const Int64.zero; Const Int64.one; e2_opnd]))] @ str2 @ str1 @ (get_third e2_compile))
     | _ -> failwith "Illegal lhs"
     end
   | Decl (vdecl) ->
-    let uid = fst vdecl in
+    let name = fst vdecl in
+    let uid = gensym name in
     let exp_compile = cmp_exp c (snd vdecl) in
-    let update_ctxt = Ctxt.add c uid (get_first exp_compile, Id uid) in
+    let update_ctxt = Ctxt.add c name (get_first exp_compile, Id uid) in
     (update_ctxt, [E (uid, Alloca (get_first exp_compile))] @ [I (uid, Store (get_first exp_compile, get_second exp_compile, Id uid))] @ (get_third exp_compile))
-  | SCall (id, explist) -> failwith "SCall not yet implemented"
-  | If (exp, block1, block2) ->
-    let rec stream_of_block (c:Ctxt.t) (rt:Ll.ty) (b:block) : stream =
-      begin match b with
-      | [] -> []
-      | h::tl -> (stream_of_block c rt tl) @ (snd (cmp_stmt c rt h))
+  | SCall (id, l) ->
+    let (ll_ftyp, ctxt_id) = Ctxt.lookup_function id c in
+    let fid = gensym "fun" in
+    let rec args_list (c:Ctxt.t) (tl: Ll.ty list) (el: exp node list): stream * (Ll.ty * operand) list =
+      begin match (tl, el) with
+      | [],[] -> [], []
+      | h1::t1, h2::t2 ->
+        let temp = (args_list c t1 t2) in
+        let exp_comp = cmp_exp c h2 in
+        (get_third exp_comp) @ (fst temp), (h1, get_second exp_comp) :: (snd temp)
+      | _ -> failwith "not enough args"
       end in
-    let b1_stream = stream_of_block c rt block1 in
-    let b2_stream = stream_of_block c rt block2 in
+    let args = args_list c (List.rev (fst ll_ftyp)) l in
+    c, [I(fid, Call (snd ll_ftyp, Gid id, snd args))] @ (fst args)
+  | If (exp, block1, block2) ->
     let then_block = gensym "then" in
     let else_block = gensym "else" in
     let merge = gensym "merge" in
     let test = gensym "test" in
     let cond = cmp_exp c exp in
-    (c, [L merge] @ b2_stream @ [T (Br merge); L else_block] @ b1_stream
-    @ [T (Br merge); L then_block; T (Cbr (Id test, else_block, then_block));
+    (c, [L merge; T (Br merge)] @ (cmp_block c rt block2) @ [L else_block; T (Br merge)] @ (cmp_block c rt block1)
+    @ [L then_block; T (Cbr (Id test, else_block, then_block));
     I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero))] @ (get_third cond))
-  | For (vdecls, exp_option, stmt_option, block) -> failwith "For not yet implemented"
+  | For (vdecls, exp_option, stmt_option, block) ->
+    let rec ctxt_helper (c: Ctxt.t) (vdecls : vdecl list) (str: stream): Ctxt.t * stream =
+      begin match vdecls with
+      | [] -> c, str
+      | h::tl ->
+        let cmp_e = cmp_exp c (snd h) in
+        let id = gensym (fst h) in
+        let update_ctxt = Ctxt.add c (fst h) (get_first cmp_e, Id id)in
+        ctxt_helper update_ctxt tl ([E (id, Alloca (get_first cmp_e))] @
+        [I (id, Store (get_first cmp_e, get_second cmp_e, Id id))] @ (get_third cmp_e) @ str)
+      end in
+    let temp = ctxt_helper c vdecls [] in
+    let new_c = (fst temp) @ c in
+    let test = gensym "test" in
+    let lpost = gensym "post" in
+    let lbody = gensym "body" in
+    let lpre = gensym "pre" in
+    begin match (exp_option, stmt_option) with
+    | None, _ -> failwith "infinite loop"
+    | Some s, None -> failwith "infinite loop"
+      (* let cond = cmp_exp new_c s in
+      (new_c, [L lpost; T (Br lpre)] @ (cmp_block new_c rt block) @ [L lbody; T (Cbr (Id test, lpost, lbody));
+        I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero))] @ (get_third cond) @ (snd temp) @[L lpre ; T (Br lpre)]) *)
+    | Some s1, Some s2 ->
+      let opn = cmp_stmt new_c rt s2 in
+      let cond = cmp_exp new_c s1 in
+      ((fst opn @ new_c), [L lpost; T (Br lpre)] @ (snd opn) @ (cmp_block new_c rt block) @ [L lbody; T (Cbr (Id test, lpost, lbody));
+        I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero))] @ (get_third cond) @ [L lpre ; T (Br lpre)] @ (snd temp))
+    end
   | While (exp, block) ->
     let test = gensym "test" in
     let lpost = gensym "post" in
     let lbody = gensym "body" in
     let lpre = gensym "pre" in
     let cond = cmp_exp c exp in
-    (c, [L lpost] @ (cmp_block c rt block) @ [T (Br lpre); L lbody; T (Cbr (Id test, lpost, lbody));
+    (c, [L lpost; T (Br lpre)] @ (cmp_block c rt block) @ [L lbody; T (Cbr (Id test, lpost, lbody));
       I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero))] @ (get_third cond) @ [L lpre ; T (Br lpre)])
+    (* (c, [T (Br lpre); L lpre] @ (get_third cond) @ [I (test, Icmp (Eq, I1, get_second cond, Const Int64.zero));
+    T (Cbr (Id test, lpost, lbody)); L lbody; T (Br lpre)] @ (cmp_block c rt block) @ [L lpost]) *)
   end
 
 (* Compile a series of statements *)
@@ -353,8 +495,15 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
   let rec global_ctxt_helper (ct:Ctxt.t) (pr:Ast.prog) : Ctxt.t =
     begin match pr with
     | [] -> ct
-    | (Gvdecl a) :: rest -> global_ctxt_helper (add ct a.elt.name (type_helper a.elt.init.elt, Gid a.elt.name)) rest
-    | (Gfdecl a) :: rest -> global_ctxt_helper (add ct a.elt.name (cmp_ty a.elt.rtyp, Gid a.elt.name)) rest
+    | (Gvdecl v) :: rest -> global_ctxt_helper (add ct v.elt.name (type_helper v.elt.init.elt, Gid v.elt.name)) rest
+    | (Gfdecl f) :: rest ->
+      let rec arg_type (ctt:Ctxt.t) (l:(ty*id) list) (tail:ty list) : Ctxt.t * ty list =
+        begin match l with
+        | [] -> ctt, tail
+        | (t,i)::tl -> arg_type (add ctt i (cmp_ty t, (Id (gensym i)))) tl (t::tail)
+        end in
+        let temp = arg_type ct f.elt.args [] in
+        global_ctxt_helper (add (fst temp) f.elt.name (cmp_ty (TFun (snd temp, f.elt.rtyp)), Gid f.elt.name)) rest
     end in
   global_ctxt_helper c p
 
@@ -372,24 +521,27 @@ let cmp_global_ctxt (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
  *)
 let cmp_fdecl (c:Ctxt.t) (f:Ast.fdecl node) : Ll.fdecl * (Ll.gid * Ll.gdecl) list =
   let open Ctxt in
-  let rec f_type_helper (args: (ty * id) list) (tyl : Ll.ty list) (c:Ctxt.t) : Ll.ty list * Ctxt.t =
+  let rec get_function_type (args: (ty * id) list) (tyl : Ll.ty list) : Ll.ty list =
     begin match args with
-    | [] -> (tyl, c)
-    | (t, i) :: tl -> f_type_helper tl (tyl @ [cmp_ty t]) (add c i (cmp_ty t, Id i))
+    | [] -> tyl
+    | (arg_type, arg_id) :: tl ->
+    get_function_type tl (tyl @ [cmp_ty arg_type])
     end in
-  let helper_result = f_type_helper f.elt.args [] c in
-  let fty_final = (fst helper_result, cmp_ty f.elt.rtyp) in
-  let new_c = snd helper_result in
-  let rec f_param_helper (args: (ty * id) list) (uidl : uid list) : uid list =
+  let fty_final = ((get_function_type f.elt.args []), cmp_ty f.elt.rtyp) in
+  let rec f_param_helper (c:Ctxt.t) (args: (ty * id) list) (uidl : uid list) (str : stream) : Ctxt.t * uid list * stream  =
     begin match args with
-    | [] -> uidl
-    | (t, i) :: tl -> f_param_helper tl (uidl @ [i])
+    | [] -> c, uidl, str
+    | (arg_type, arg_id) :: tl ->
+      let param_name = gensym arg_id in
+      (* print_string store_param_name; *)
+      let update_ctxt = Ctxt.add c arg_id (cmp_ty arg_type, Id param_name) in
+      f_param_helper update_ctxt tl (uidl @ [arg_id])
+      (str @ [I (param_name, Store(cmp_ty arg_type, Id arg_id, Id param_name))] @ [E (param_name, Alloca (cmp_ty arg_type))])
     end in
-  let param_final = f_param_helper f.elt.args [] in
-  let cfg_stream = cfg_of_stream (cmp_block new_c (cmp_ty f.elt.rtyp) f.elt.body) in
+  let (final_ctxt, final_param_list, final_stream) = f_param_helper c f.elt.args [] [] in
+  let cfg_stream = cfg_of_stream ((cmp_block final_ctxt (cmp_ty f.elt.rtyp) f.elt.body) @ final_stream) in
   let global_final = snd cfg_stream in
-  ({fty=fty_final; param=param_final; cfg=(fst cfg_stream)}, global_final)
-
+  ({fty=fty_final; param=final_param_list; cfg=(fst cfg_stream)}, global_final)
 
 
 (* Compile a global initializer, returning the resulting LLVMlite global
@@ -413,7 +565,21 @@ let rec cmp_gexp (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.gdecl) list =
     end
   | CInt i -> ((cmp_ty TInt, GInt i), [])
   | CStr s -> ((Array(String.length s + 1, I8), GString s), [])
-  | CArr (t, l) -> failwith "array not yet implemented"
+  | CArr (t, l) ->
+    let rec gdecl_list (l : exp node list) : Ll.gdecl list =
+      begin match l with
+      | [] -> []
+      | h::tl -> (fst (cmp_gexp h)) :: (gdecl_list tl)
+      end in
+    let rec arr_list (l : exp node list) : (Ll.gid * Ll.gdecl) list =
+      begin match l with
+      | [] -> []
+      | h::tl ->
+        let glob = gensym "glob" in
+        (glob, fst (cmp_gexp h)) :: (snd (cmp_gexp h)) @ (arr_list tl)
+      end in
+    (Struct [I64; Array(List.length l, cmp_ty t)], GStruct [(I64, GInt (Int64.of_int (List.length l)));
+     (Array(List.length l, cmp_ty t), GArray (gdecl_list l))]), (arr_list l)
   | _ -> failwith "not global exp"
   end
 
