@@ -237,15 +237,20 @@ let old_student_tests = [
   ; ("atprograms/maxsubsequence.oat", "", "107")
 ]
 
+let self_test = [
+  ("atprograms/is_prime.oat", "", "5");
+]
+
 let tests : suite =
   [
-    GradedTest("parse tests", 15, parse_tests);
+    (* GradedTest("parse tests", 15, parse_tests);
     GradedTest("easiest tests", 15, executed_oat_file easiest_tests);
     GradedTest("globals tests", 15, executed_oat_file globals_tests);
     GradedTest("path tests", 10, executed_oat_file path_tests);
     GradedTest("easy tests", 15, executed_oat_file easy_tests);
     GradedTest("medium tests", 10, executed_oat_file medium_tests);
-    GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests));
+    GradedTest("hard tests", 10, executed_oat_file (hard_tests @ old_student_tests)); *)
+    GradedTest("written test", 0, executed_oat_file (self_test));
   ]
 
 let manual_tests : suite = [
