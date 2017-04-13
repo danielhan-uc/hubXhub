@@ -69,13 +69,57 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
   | CBool b -> TBool
   | CInt i64 -> TInt
   | CStr s -> TRef RString
-  | CArr (ty, el) -> TRef (RArray ty)
-  (* | CStruct (id, fl) -> *)
-  (* | Proj (e, id) -> *)
-  | NewArr (ty, e) -> TRef (RArray ty)
-  (* | Id id -> *)
-  (* | Index (e1, e2) -> *)
-  (* | Call (e, el) -> *)
+  | CArr (ty, el) ->
+    List.iter (fun f ->
+      if not ((typecheck_exp c f) == ty)
+      then type_error f "typecheck_exp : array entry error"
+      else ()) el;
+    TRef (RArray ty)
+  | CStruct (id, fl) ->
+    if not ((lookup_struct_option id c) == None) then
+      (List.iter (fun f ->
+      if not ((lookup_field id f.cfname c) == (typecheck_exp c f.cfinit))
+      then type_error f.cfinit "typecheck_exp : struct field error"
+      else ()) fl;
+      TRef (RStruct id))
+    else type_error e "typecheck_exp : struct not in ctxt"
+  | Proj (e1, id) ->
+    begin match typecheck_exp c e1 with
+    | TRef (RStruct st_id) ->
+      if not ((lookup_field_option st_id id c) == None) then
+        lookup_field st_id id c
+      else type_error e1 "typecheck_exp : projection field does not exist"
+    | _ -> type_error e1 "typecheck_exp : projection not a struct"
+    end
+  | NewArr (ty, e1) ->
+    if not ((typecheck_exp c e1) == TInt) then
+      type_error e1 "typecheck_exp : array init error"
+    else ();
+    TRef (RArray ty)
+  | Id id ->
+    if (lookup_option id c) == None then
+      if not ((lookup_function_option id c) == None) then
+        let fty = lookup_function id c in
+        TRef (RFun fty)
+      else type_error e "typecheck_exp : id not in tctxt"
+    else lookup id c
+  | Index (e1, e2) ->
+    begin match typecheck_exp c e1 with
+    | TRef (RArray ty) ->
+      if not ((typecheck_exp c e2) == TInt) then
+        type_error e2 "typecheck_exp : array index not an integer"
+      else ty
+    | _ -> type_error e1 "typecheck_exp : not indexing an array"
+    end
+  | Call (e1, el) ->
+    begin match typecheck_exp c e1 with
+    | TRef (RFun (tl, RetVal t)) ->
+      List.iter2 (fun f t ->
+      if (typecheck_exp c f) == t then ()
+      else type_error f "typecheck_exp : argument type error") el tl;
+      TRef (RFun (tl, RetVal t))
+    | _ -> type_error e1 "typecheck_exp : call not function"
+    end
   | Bop (binop, e1, e2) ->
     let (t1, t2, rty) = typ_of_binop binop in
     begin match (typecheck_exp c e1, typecheck_exp c e2) with
@@ -85,16 +129,16 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
                       else type_error e "typecheck_exp : wrong binop param 2"
     | _ -> type_error e "typecheck_exp : wrong binop param 3"
     end
-  | Uop (unop, e) ->
+  | Uop (unop, e1) ->
     let (t, rty) = typ_of_unop unop in
-    begin match (typecheck_exp c e) with
+    begin match (typecheck_exp c e1) with
     | TInt -> if (t == TInt) then rty
-              else type_error e "typecheck_exp : wrong unop param 1"
+              else type_error e1 "typecheck_exp : wrong unop param 1"
     | TBool -> if (t == TBool) then rty
-              else type_error e "typecheck_exp : wrong unop param 2"
+              else type_error e1 "typecheck_exp : wrong unop param 2"
     | _ -> type_error e "typecheck_exp : wrong unop param 3"
     end
-  | _ -> failwith "not done yet typecheck_exp"
+
   end
 
 
@@ -115,7 +159,7 @@ type stmt_type = NoReturn | Return
      lattice of stmt_type values given by the reflexive relation, plus:
            Return <: NoReturn
      Intuitively: if one of the two branches of a conditional does not contain a
-     return statement, then the entier conditional statement might not return.
+     return statement, then the entire conditional statement might not return.
 
    - You will probably find it convenient to add a helper function that implements the
      block typecheck rules.
@@ -131,10 +175,57 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
   | Assn (e1, e2) -> if typecheck_lhs tc e1 == typecheck_exp tc e2
                      then (tc, NoReturn)
                      else type_error s "typecheck_stmt : assignment error"
-  | _ -> failwith "not yet implemented : typecheck_stmt"
+  | Decl vdecl ->
+    (add_local tc (fst vdecl) (typecheck_exp tc (snd vdecl)), NoReturn)
+  | Ret exp_op ->
+    begin match exp_op with
+    | None -> if to_ret == RetVoid then (tc, Return) else type_error s "typecheck_stmt : ret void error"
+    | Some c ->  if RetVal (typecheck_exp tc c) == to_ret
+                 then (tc, Return)
+                 else type_error s "typecheck_stmt : ret value error"
+    end
+  | SCall (e1, el) ->
+    begin match typecheck_exp tc e1 with
+    | TRef (RFun (tl, RetVoid)) ->
+      List.iter2 (fun f t ->
+      if (typecheck_exp tc f) == t then ()
+      else type_error f "typecheck_stmt : argument type error") el tl;
+      (tc, NoReturn)
+    | _ -> type_error e1 "typecheck_stmt : scall not function"
+    end
+  | If (exp, b1, b2) ->
+    if ((typecheck_exp tc exp) == TBool) && ((snd (typecheck_block tc b1 to_ret)) == Return)
+    && ((snd (typecheck_block tc b2 to_ret)) == Return) then
+      (tc, Return)
+    else (tc, NoReturn)
+  | For (vl, exp_op, stmt_op, b) ->
+    let new_tc = List.fold_left (fun c v -> add_local c (fst v) (typecheck_exp c (snd v))) tc vl in
+    let check_block = typecheck_block new_tc b to_ret in
+    begin match exp_op, stmt_op with
+    | (Some exp, Some stmt) ->
+      let stmt_check = typecheck_stmt new_tc stmt to_ret in
+      if ((typecheck_exp new_tc exp) == TBool) && ((snd stmt_check) == NoReturn) then
+        (tc, NoReturn)
+      else type_error s "typecheck_stmt : for loop setup error 1"
+    | (Some exp, None) ->
+      if (typecheck_exp new_tc exp) == TBool then
+        (tc, NoReturn)
+      else type_error s "typecheck_stmt : for loop setup error 2"
+    | (None, Some stmt) ->
+      let stmt_check = typecheck_stmt new_tc stmt to_ret in
+      if (snd stmt_check) == NoReturn then
+        (tc, NoReturn)
+      else type_error s "typecheck_stmt : for loop setup error 1"
+    | (None, None) -> (tc, NoReturn)
+    end
+  | While (exp, b) ->
+    let check_block = typecheck_block tc b to_ret in
+    if (typecheck_exp tc exp) == TBool then
+      (tc, NoReturn)
+    else type_error s "typecheck_stmt : while condition type not bool"
   end
 
-and typecheck_block (tc : Tctxt.t) (block : Ast.block) (rty : Ast.ret_ty)(l : 'a Ast.node) =
+and typecheck_block (tc : Tctxt.t) (block : Ast.block) (rty : Ast.ret_ty) =
   List.fold_left (fun (c,r) stmt -> if (snd (typecheck_stmt tc stmt rty)) == Return
                                     then (fst (typecheck_stmt c stmt rty), Return) else (fst (typecheck_stmt c stmt rty), r))
                                     (tc, NoReturn) block
@@ -173,7 +264,7 @@ let typecheck_tdecl (tc : Tctxt.t) l  (loc : 'a Ast.node) =
 
 let typecheck_fdecl (tc : Tctxt.t) (f : Ast.fdecl) (l : 'a Ast.node)  =
   let update_context = List.fold_left (fun c (ty, id) -> Tctxt.add_local c id ty) tc f.args in
-  let (tctxt, stmt_type) = typecheck_block update_context f.body f.rtyp l in
+  let (tctxt, stmt_type) = typecheck_block update_context f.body f.rtyp in
   if stmt_type == NoReturn then type_error l "typecheck_fdecl : fdecl not return"
   else ()
 
