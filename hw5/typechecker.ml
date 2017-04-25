@@ -78,8 +78,10 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
   | CStruct (id, fl) ->
     if not ((lookup_struct_option id c) = None) then
       (List.iter (fun f ->
-      if not ((lookup_field id f.cfname c) = (typecheck_exp c f.cfinit))
-      then type_error f.cfinit "typecheck_exp : struct field error"
+      if ((lookup_field_option id f.cfname c) = None) ||
+         (not ((lookup_field id f.cfname c) = (typecheck_exp c f.cfinit))) ||
+         (not (List.length fl = List.length (lookup_struct id c))) then
+      type_error f.cfinit "typecheck_exp : struct field error"
       else ()) fl;
       TRef (RStruct id))
     else type_error e "typecheck_exp : struct not in ctxt"
@@ -113,11 +115,13 @@ let rec typecheck_exp (c : Tctxt.t) (e : Ast.exp node) : Ast.ty =
     end
   | Call (e1, el) ->
     begin match typecheck_exp c e1 with
-    | TRef (RFun (tl, RetVal t)) ->
+    | TRef (RFun (tl, RetVal rt)) ->
+      if not (List.length tl = List.length el) then type_error e1 "typecheck_exp : incorrect amount of args"
+      else ();
       List.iter2 (fun f t ->
       if (typecheck_exp c f) = t then ()
       else type_error f "typecheck_exp : argument type error") el tl;
-      TRef (RFun (tl, RetVal t))
+      rt
     | _ -> type_error e1 "typecheck_exp : call not function"
     end
   | Bop (binop, e1, e2) ->
@@ -176,7 +180,9 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
                      then (tc, NoReturn)
                      else type_error s "typecheck_stmt : assignment error"
   | Decl vdecl ->
+    if (lookup_local_option (fst vdecl) tc) = None then
     (add_local tc (fst vdecl) (typecheck_exp tc (snd vdecl)), NoReturn)
+    else type_error (snd vdecl) "typecheck_stmt : overwrite variable"
   | Ret exp_op ->
     begin match exp_op with
     | None -> if to_ret = RetVoid then (tc, Return) else type_error s "typecheck_stmt : ret void error"
@@ -194,10 +200,12 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
     | _ -> type_error e1 "typecheck_stmt : scall not function"
     end
   | If (exp, b1, b2) ->
-    if ((typecheck_exp tc exp) = TBool) && ((snd (typecheck_block tc b1 to_ret)) = Return)
-    && ((snd (typecheck_block tc b2 to_ret)) = Return) then
+    if ((typecheck_exp tc exp) = TBool) then
+      if ((snd (typecheck_block tc b1 to_ret)) = Return)
+      && ((snd (typecheck_block tc b2 to_ret)) = Return) then
       (tc, Return)
-    else (tc, NoReturn)
+      else (tc, NoReturn)
+    else type_error exp "typecheck_stmt : if condition not bool"
   | For (vl, exp_op, stmt_op, b) ->
     let new_tc = List.fold_left (fun c v -> add_local c (fst v) (typecheck_exp c (snd v))) tc vl in
     let check_block = typecheck_block new_tc b to_ret in
@@ -226,9 +234,21 @@ let rec typecheck_stmt (tc : Tctxt.t) (s:Ast.stmt node) (to_ret:ret_ty) : Tctxt.
   end
 
 and typecheck_block (tc : Tctxt.t) (block : Ast.block) (rty : Ast.ret_ty) =
-  List.fold_left (fun (c,r) stmt -> if (snd (typecheck_stmt c stmt rty)) = Return
+  begin match block with
+  | [] -> (tc, NoReturn)
+  | h :: [] ->
+    let ret_stmt = typecheck_stmt tc h rty in
+    if (snd ret_stmt) = Return then
+      (fst ret_stmt, Return)
+    else (fst ret_stmt, NoReturn)
+  | h :: tl ->
+    let st = typecheck_stmt tc h rty in
+    if (snd st) = Return then type_error h "typecheck_block : early return"
+    else typecheck_block (fst st) tl rty
+  end
+  (* List.fold_left (fun (c,r) stmt -> if (snd (typecheck_stmt c stmt rty)) = Return
                                     then (fst (typecheck_stmt c stmt rty), Return) else (fst (typecheck_stmt c stmt rty), r))
-                                    (tc, NoReturn) block
+                                    (tc, NoReturn) block *)
 
 
 (* well-formed types -------------------------------------------------------- *)
@@ -312,7 +332,7 @@ let create_function_ctxt (tc:Tctxt.t) (p:Ast.prog) : Tctxt.t =
   List.fold_left (fun c d ->
     match d with
     | Gfdecl ({elt=f} as l) ->
-      let tl = List.fold_left (fun l e -> (fst e)::l) [] f.args in
+      let tl = List.fold_left (fun l e -> l @ [fst e]) [] f.args in
       if (lookup_function_option f.name c) = None
       then add_function c f.name (tl, f.rtyp)
       else type_error l "create_function_ctxt : duplicate function name"
@@ -324,7 +344,12 @@ List.fold_left (fun c d ->
   match d with
   | Gvdecl ({elt=g} as l) ->
     if (lookup_global_option g.name c) = None
-    then add_global c g.name (typecheck_exp c g.init)
+    then
+      match g.init.elt with
+      | Id i -> if (lookup_global_option) i c = None then
+                  add_global c g.name (typecheck_exp c g.init)
+                else type_error g.init "create_global_ctxt : scope error"
+      | _ -> add_global c g.name (typecheck_exp c g.init)
     else type_error l "create_global_ctxt : duplicate global variable name"
   | _ -> c) tc p
 

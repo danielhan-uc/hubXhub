@@ -38,18 +38,13 @@
 # Target: frontend.ml.depends, tags: { extension:ml, file:frontend.ml, ocaml, ocamldep, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules frontend.ml > frontend.ml.depends # cached
 # Target: typechecker.ml.depends, tags: { extension:ml, file:typechecker.ml, ocaml, ocamldep, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules typechecker.ml > typechecker.ml.depends
+/Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules typechecker.ml > typechecker.ml.depends # cached
 # Target: tctxt.ml.depends, tags: { extension:ml, file:tctxt.ml, ocaml, ocamldep, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules tctxt.ml > tctxt.ml.depends # cached
 # Target: tctxt.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:tctxt.cmo, file:tctxt.ml, implem, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o tctxt.cmo tctxt.ml # cached
 # Target: typechecker.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:typechecker.cmo, file:typechecker.ml, implem, ocaml, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o typechecker.cmo typechecker.ml
-+ /Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o typechecker.cmo typechecker.ml
-File "typechecker.ml", line 203, characters 8-19:
-Warning 26: unused variable check_block.
-File "typechecker.ml", line 222, characters 8-19:
-Warning 26: unused variable check_block.
+/Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o typechecker.cmo typechecker.ml # cached
 # Target: frontend.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:frontend.cmo, file:frontend.ml, implem, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o frontend.cmo frontend.ml # cached
 # Target: lexer.mll, tags: { extension:mll, file:lexer.mll, lexer, ocaml, ocamllex, quiet }
@@ -83,13 +78,13 @@ menhir --ocamlc '/Users/hand/.opam/4.04.0/bin/ocamlc.opt -I ll -I x86 -I util' -
 # Target: driver.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:driver.cmo, file:driver.ml, implem, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o driver.cmo driver.ml # cached
 # Target: gradedtests.ml.depends, tags: { extension:ml, file:gradedtests.ml, ocaml, ocamldep, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules gradedtests.ml > gradedtests.ml.depends # cached
-# Target: gradedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:gradedtests.cmo, file:gradedtests.ml, implem, ocaml, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o gradedtests.cmo gradedtests.ml # cached
+/Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules gradedtests.ml > gradedtests.ml.depends
 # Target: providedtests.ml.depends, tags: { extension:ml, file:providedtests.ml, ocaml, ocamldep, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamldep.opt -modules providedtests.ml > providedtests.ml.depends # cached
 # Target: providedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:providedtests.cmo, file:providedtests.ml, implem, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o providedtests.cmo providedtests.ml # cached
+# Target: gradedtests.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:gradedtests.cmo, file:gradedtests.ml, implem, ocaml, quiet }
+/Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o gradedtests.cmo gradedtests.ml
 # Target: main.cmo, tags: { byte, compile, extension:cmo, extension:ml, file:main.cmo, file:main.ml, implem, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlc.opt -c -I x86 -I util -I ll -o main.cmo main.ml # cached
 # Target: util/assert.ml.depends, tags: { extension:ml, file:util/assert.ml, ocaml, ocamldep, quiet }
@@ -115,12 +110,7 @@ menhir --ocamlc '/Users/hand/.opam/4.04.0/bin/ocamlc.opt -I ll -I x86 -I util' -
 # Target: tctxt.cmx, tags: { compile, extension:cmx, extension:ml, file:tctxt.cmx, file:tctxt.ml, implem, native, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o tctxt.cmx tctxt.ml # cached
 # Target: typechecker.cmx, tags: { compile, extension:cmx, extension:ml, file:typechecker.cmx, file:typechecker.ml, implem, native, ocaml, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o typechecker.cmx typechecker.ml
-+ /Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o typechecker.cmx typechecker.ml
-File "typechecker.ml", line 203, characters 8-19:
-Warning 26: unused variable check_block.
-File "typechecker.ml", line 222, characters 8-19:
-Warning 26: unused variable check_block.
+/Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o typechecker.cmx typechecker.ml # cached
 # Target: frontend.cmx, tags: { compile, extension:cmx, extension:ml, file:frontend.cmx, file:frontend.ml, implem, native, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o frontend.cmx frontend.ml # cached
 # Target: parser.ml.depends, tags: { extension:ml, file:parser.ml, ocaml, ocamldep, quiet }
@@ -137,12 +127,12 @@ Warning 26: unused variable check_block.
 /Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I ll -I x86 -I util -o ll/lllexer.cmx ll/lllexer.ml # cached
 # Target: driver.cmx, tags: { compile, extension:cmx, extension:ml, file:driver.cmx, file:driver.ml, implem, native, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o driver.cmx driver.ml # cached
-# Target: gradedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:gradedtests.cmx, file:gradedtests.ml, implem, native, ocaml, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o gradedtests.cmx gradedtests.ml # cached
 # Target: providedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:providedtests.cmx, file:providedtests.ml, implem, native, ocaml, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o providedtests.cmx providedtests.ml # cached
+# Target: gradedtests.cmx, tags: { compile, extension:cmx, extension:ml, file:gradedtests.cmx, file:gradedtests.ml, implem, native, ocaml, quiet }
+/Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o gradedtests.cmx gradedtests.ml
 # Target: main.cmx, tags: { compile, extension:cmx, extension:ml, file:main.cmx, file:main.ml, implem, native, ocaml, quiet }
-/Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o main.cmx main.ml # cached
+/Users/hand/.opam/4.04.0/bin/ocamlopt.opt -c -I x86 -I util -I ll -o main.cmx main.ml
 # Target: main.native, tags: { dont_link_with, extension:native, file:main.native, link, native, ocaml, program, quiet }
 /Users/hand/.opam/4.04.0/bin/ocamlopt.opt unix.cmxa str.cmxa nums.cmxa util/range.cmx ast.cmx astlib.cmx ll/ll.cmx util/platform.cmx x86/x86.cmx backend.cmx tctxt.cmx typechecker.cmx frontend.cmx parser.cmx lexer.cmx ll/llparser.cmx ll/lllexer.cmx driver.cmx util/assert.cmx gradedtests.cmx providedtests.cmx main.cmx -o main.native
 # Compilation successful.

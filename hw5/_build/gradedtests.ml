@@ -10,11 +10,11 @@ open Driver
 
 let oat_file_test path args =
   let () = Platform.verb @@ Printf.sprintf "** Processing: %s\n" path in
-  
+
   let output_path = !Platform.output_path in
   let dot_ll_file = Platform.gen_name output_path "test" ".ll" in
   let exec_file = Platform.gen_name output_path "exec" "" in
-  let tmp_file = Platform.gen_name output_path "tmp" ".txt" in  
+  let tmp_file = Platform.gen_name output_path "tmp" ".txt" in
 
   let oat_ast = parse_oat_file path in
   Typechecker.typecheck_program oat_ast;
@@ -168,12 +168,13 @@ let hw4_old_student_tests = [
 ]
 
 let hw4_tests : suite =
-  [ GradedTest("easiest tests", 1, executed_oat_file hw4_easiest_tests);
+  [
+    (* GradedTest("easiest tests", 1, executed_oat_file hw4_easiest_tests);
     GradedTest("globals tests", 1, executed_oat_file hw4_globals_tests);
     GradedTest("path tests", 1, executed_oat_file hw4_path_tests);
     GradedTest("easy tests", 2, executed_oat_file hw4_easy_tests);
     GradedTest("medium tests", 2, executed_oat_file hw4_medium_tests);
-    GradedTest("hard tests", 3, executed_oat_file (hw4_hard_tests @ hw4_old_student_tests));    
+    GradedTest("hard tests", 3, executed_oat_file (hw4_hard_tests @ hw4_old_student_tests)); *)
   ]
 
 let typecheck_statement_error_tests =
@@ -209,7 +210,7 @@ let typecheck_error_expression_tests =
     "hw5programs/tc_error_null.oat";
   ]
 
-let typecheck_error_struct_tests = 
+let typecheck_error_struct_tests =
   [ "hw5programs/tc_error_struct_proj.oat";
     "hw5programs/tc_error_struct1.oat";
     "hw5programs/tc_error_struct2.oat";
@@ -249,7 +250,7 @@ let typecheck_tests : suite = [
     GradedTest("other correct tests", 5, typecheck_file_correct typecheck_correct_other_tests);
     GradedTest("expression error tests", 10, typecheck_file_error typecheck_error_expression_tests);
     GradedTest("struct/global error tests", 10, typecheck_file_error (typecheck_error_struct_tests @ typecheck_error_global_tests));
-    GradedTest("other correct tests", 5, typecheck_file_correct typecheck_correct_other_tests);    
+    GradedTest("other correct tests", 5, typecheck_file_correct typecheck_correct_other_tests);
   ]
 
 let struct_tests = [
@@ -260,11 +261,11 @@ let struct_tests = [
 ("hw5programs/compile_return_struct.oat", "", "0");
 ("hw5programs/compile_struct_array.oat", "", "15");
 ("hw5programs/compile_struct_fptr.oat", "", "7");
-("hw5programs/compile_various_fields.oat", "", "hello253"); 
+("hw5programs/compile_various_fields.oat", "", "hello253");
 ]
 
 let fptr_tests = [
-  ("hw5programs/compile_array_fptr.oat", "", "2");
+  (* ("hw5programs/compile_array_fptr.oat", "", "2");
   ("hw5programs/compile_func_argument.oat", "", "4");
   ("hw5programs/compile_global_fptr.oat", "", "7");
   ("hw5programs/compile_global_fptr_unordered.oat", "", "2");
@@ -273,12 +274,14 @@ let fptr_tests = [
   ("hw5programs/compile_local_fptr.oat", "", "5");
   ("hw5programs/compile_function_shadow.oat", "", "12");
   ("hw5programs/compile_global_struct_fptr.oat", "", "20");
-  ("hw5programs/compile_builtin_argument.oat", "", "abab0");    
+  ("hw5programs/compile_builtin_argument.oat", "", "abab0"); *)
+  ("hw5programs/rgbTogray.oat", "", "0");
 ]
 
 let hw5_tests : suite =
-  [ GradedTest("struct tests", 20, executed_oat_file struct_tests);
-    GradedTest("fptr tests", 15, executed_oat_file fptr_tests);   
+  [
+    (* GradedTest("struct tests", 20, executed_oat_file struct_tests); *)
+    GradedTest("fptr tests", 15, executed_oat_file fptr_tests);
   ]
 
 
@@ -292,4 +295,4 @@ let manual_tests : suite = [
   );
 ]
 
-let graded_tests : suite = hw4_tests @ hw5_tests @ typecheck_tests @ manual_tests 
+let graded_tests : suite = hw4_tests @ hw5_tests @ typecheck_tests @ manual_tests

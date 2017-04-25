@@ -1,0 +1,83 @@
+struct RGB {
+  int red;
+  int green;
+  int blue
+}
+
+struct GrayScale {
+  int Lightness;
+  int Average;
+  int Luminosity;
+}
+
+int div (int a, int b) {
+  var count = 0;
+  var cur_num = a;
+  while (cur_num - b >= 0) {
+    cur_num = cur_num - b;
+    count = count + 1;
+  }
+  return count;
+}
+
+int max (int a, int b, int c) {
+  var m = 0;
+  if (a > b) {
+    m = a;
+  } else {
+    m = b;
+  }
+
+  if (c > m) {
+    m = c;
+  }
+
+  return m;
+}
+
+int min (int a, int b, int c) {
+  var m = 0;
+  if (a < b) {
+    m = a;
+  } else {
+    m = b;
+  }
+
+  if (c < m) {
+    m = c;
+  }
+
+  return m;
+}
+
+GrayScale RGBtoGrayScale (RGB rgb) {
+  var maxNum = max(rgb.red, rgb.green, rgb.blue);
+  var minNum = min(rgb.red, rgb.green, rgb.blue);
+
+  var maxmin = maxNum + minNum;
+  var lightness = div(maxmin, 2);
+
+  var averageSum = rgb.red + rgb.green + rgb.blue;
+  var average = div(averageSum, 3);
+
+  var luminositySum = (rgb.red * 21) + (rgb.red * 72) + (rgb.red * 7)
+  var luminosity = div(luminositySum, 100);
+
+  var gray = new GrayScale { Lightness = lightness; Average = average; Luminosity = luminosity };
+  return gray;
+}
+
+  global rgbs = RGB { red = 200; green = 150; blue = 130 }
+
+  global grays = GrayScale { Lightness = 150; Average = 150; Luminosity = 150 }
+
+  int program (int argc, string[] argv) {
+    var answer = 0;
+    for (var i = 0; i < 8; i = i + 1;)
+    {
+      if(isPrime(list[i])) {
+        answer = answer + 1;
+      }
+    }
+    return answer;
+  }

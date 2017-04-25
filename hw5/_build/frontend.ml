@@ -149,7 +149,8 @@ and cmp_fty ct (ts,r:Ast.fty) : Ll.fty =
 and cmp_rty ct : Ast.rty -> Ll.ty = function
   | Ast.RString  -> I8
   | Ast.RArray u -> Struct [I64; Array(0, cmp_ty ct u)]
-  (* TODO: add cases for structs and funs *)
+  | Ast.RStruct i -> Namedt i
+  | Ast.RFun fty -> Fun (cmp_fty ct fty)
 
 let typ_of_binop : Ast.binop -> Ast.ty * Ast.ty * Ast.ty = function
   | Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr -> (TInt, TInt, TInt)
@@ -197,7 +198,13 @@ let oat_alloc_array ct (t:Ast.ty) (size:Ll.operand) : Ll.ty * operand * stream =
    - make sure to calculate the correct amount of space to allocate!
 *)
 let oat_alloc_struct ct (id:Ast.id) : Ll.ty * operand * stream =
-failwith "oat_alloc_struct unimplemented"
+  let field_list = TypeCtxt.lookup id ct in (* Ast.id * Ast.field list *)
+  let ans_id, struct_id = gensym "struct", gensym "raw_struct" in
+  let struct_ty = Ptr I64 in
+  let ans_ty = cmp_ty ct (TRef (RStruct id)) in
+  ans_ty, Id ans_id, lift
+  [ struct_id, Call(struct_ty, Gid "oat_malloc", [I64, Const (Int64.mul (Int64.of_int (List.length field_list)) 8L)])
+  ; ans_id, Bitcast(struct_ty, Id struct_id, ans_ty)]
 
 let str_arr_ty s = Array(1 + String.length s, I8)
 let i1_op_of_bool b   = Ll.Const (if b then 1L else 0L)
@@ -261,12 +268,8 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
       | Ast.Bitnot -> Binop (Xor, I64, op, i64_op_of_int (-1)) in
     cmp_ty tc ret_ty, Id ans_id, code >:: I (ans_id, cmp_uop op uop)
 
-  (* TASK: Modify this case to handle function identifiers as values.
-     Hint:  it should be very straightforward, assuming that the context
-            is properly initialized
-  *)
   | Ast.Id id ->
-
+    if (Ctxt.lookup_function_option id c) = None then
         let t, op = Ctxt.lookup id c in
         begin match t with
           | Ptr t ->
@@ -274,7 +277,9 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
             t, Id ans_id, [I(ans_id, Load(Ptr t, op))]
           | _ -> failwith "broken invariant: identifier not a pointer"
         end
-
+    else
+        let t, op = Ctxt.lookup_function id c in
+        t, op, []
 
   | Ast.Index (e, i) ->
     let ans_ty, ptr_op, code = cmp_exp_lhs tc c exp in
@@ -310,7 +315,17 @@ let rec cmp_exp (tc : TypeCtxt.t) (c:Ctxt.t) (exp:Ast.exp node) : Ll.ty * Ll.ope
        - store the resulting value into the structure
    *)
   | Ast.CStruct (id, l) ->
-    failwith "TODO: constant structs"
+    let st_ty, st_op, alloc_code = oat_alloc_struct tc id in
+    let add_field s (i, exp) =
+      let exp_ty, exp_op, exp_code = cmp_exp tc c exp in
+      let find = gensym "find" in
+      s >@ exp_code >@ lift
+        [find, Gep(st_ty, st_op, [Const 0L; Const (Int64.of_int (TypeCtxt.index_of_field id i tc))])
+        ; "", Store(exp_ty, exp_op, Id find)]
+    in
+    let find_code = List.fold_left (fun s f -> add_field s (f.cfname, f.cfinit)) alloc_code l in
+    st_ty, st_op, find_code
+
 
   | Ast.Proj (e, id) ->
     let ans_ty, ptr_op, code = cmp_exp_lhs tc c exp in
@@ -330,7 +345,16 @@ and cmp_exp_lhs (tc : TypeCtxt.t) (c:Ctxt.t) (e:exp node) : Ll.ty * Ll.operand *
      Ast.proj case of the cmp_exp function (above).
   *)
   | Ast.Proj (e, i) ->
-  failwith "TODO: field projection as left-hand side"
+    let st_ty, st_op, st_code = cmp_exp tc c e in
+    let ans_ty, ans_find = match st_ty with
+    | Ptr (Namedt tid) ->
+      let ty, find = TypeCtxt.lookup_field_name i tc in
+      cmp_ty tc ty, find
+    | _ -> failwith "not a struct" in
+    let ptr_id, tmp_id = gensym "index_ptr", gensym "tmp" in
+    ans_ty, (Id ptr_id), st_code >@ lift
+    [ tmp_id, Bitcast(st_ty, st_op, Ptr I64)
+    ; ptr_id, Gep(st_ty, st_op, [i64_op_of_int 0; Const ans_find]) ]
 
   | Ast.Index (e, i) ->
     let arr_ty, arr_op, arr_code = cmp_exp tc c e in
@@ -462,8 +486,13 @@ let get_struct_defns (p:Ast.prog) : TypeCtxt.t =
    NOTE: The Gid of a function is just its source name
 *)
 let cmp_function_ctxt (tc : TypeCtxt.t) (c:Ctxt.t) (p:Ast.prog) : Ctxt.t =
-  failwith "todo: cmp_function_ctxt not finished"
-
+  let get_fun_ty tc (args: (ty * id) list) (rtyp: ret_ty) : Ll.ty =
+    let arg_type = List.fold_left (fun tl arg -> List.append tl [cmp_ty tc (fst arg)]) [] args in
+    Fun (arg_type ,cmp_ret_ty tc rtyp) in
+  List.fold_left(fun c -> function
+    | Ast.Gfdecl { elt={rtyp; name; args; body} } ->
+        Ctxt.add c name (Ptr (get_fun_ty tc args rtyp), Gid name)
+    | _ -> c) c p
 (* Populate a context with bindings for global variables
    mapping OAT identifiers to LLVMlite gids and their types.
 
@@ -545,8 +574,14 @@ let rec cmp_gexp c (tc : TypeCtxt.t) (e:Ast.exp node) : Ll.gdecl * (Ll.gid * Ll.
 
   (* TASK: Complete this code that generates the global initializers for a struct. *)
   | CStruct (id, cs) ->
-    failwith "TODO: handle global struct declarations"
-
+    let elts, fl = List.fold_right (fun cst (elts, gs) ->
+      let (gd, gdl) = cmp_gexp c tc cst.cfinit in
+      gd::elts, gdl @ gs ) cs ([], []) in
+    let type_list = List.fold_left (fun l cst -> l @ [cmp_ty tc (TypeCtxt.lookup_field id cst.cfname tc)]) [] cs in
+    let gid = gensym "global_struct" in
+    let st_t = Struct type_list in
+    let st_i = GStruct elts in
+    ((Ptr (Namedt id), GGid gid), (gid, (Namedt id, st_i))::fl)
 
   | _ -> failwith "bad global initializer"
 
